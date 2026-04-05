@@ -119,7 +119,7 @@ export default function RegistroPage() {
 
             {/* Progress steps */}
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.8rem' }}>
-              {[1, 2, 3].map((s, i) => (
+              {[1, 2, 3].map((s, _) => (
                 <div key={s} style={{ display: 'flex', alignItems: 'center', flex: s < 3 ? 1 : 'none' }}>
                   <div style={{
                     width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
