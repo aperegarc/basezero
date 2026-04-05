@@ -2,7 +2,6 @@ package com.basezero.basezero.config;
 
 import com.basezero.basezero.security.JwtAuthFilter;
 import com.basezero.basezero.security.RateLimitFilter;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -50,13 +49,29 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        // Archivos estáticos del frontend
+                        .requestMatchers(
+                                "/",
+                                "/index.html",
+                                "/assets/**",
+                                "/*.js",
+                                "/*.css",
+                                "/*.ico",
+                                "/*.png",
+                                "/*.svg",
+                                "/*.webp",
+                                "/*.woff",
+                                "/*.woff2"
+                        ).permitAll()
+                        // API pública
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/usuarios/**").hasRole("ADMINISTRADOR")
                         .requestMatchers("/api/empleados/auth/**").permitAll()
+                        .requestMatchers("/api/empresas/registro").permitAll()
+                        // API protegida
+                        .requestMatchers("/api/usuarios/**").hasRole("ADMINISTRADOR")
                         .requestMatchers("/api/empleados/**").authenticated()
                         .requestMatchers("/api/tareas/**").authenticated()
                         .requestMatchers("/api/turnos/**").authenticated()
-                        .requestMatchers("/api/empresas/registro").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -70,7 +85,10 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:5173"));
+        config.setAllowedOrigins(List.of(
+                "http://localhost:5173",
+                "https://basezero-production.up.railway.app"
+        ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
@@ -86,8 +104,6 @@ public class SecurityConfig {
         provider.setPasswordEncoder(passwordEncoder());
         return provider;
     }
-
-
 
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
