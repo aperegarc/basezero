@@ -62,19 +62,23 @@ public class Venta {
     }
 
 
-    @Autowired
-    public Venta(Long id, EstadoVenta estado, LocalDate fecha, String direccionFiscal, String codigo, LocalDate vencimiento, MetodoPago metodoPago, Cliente cliente, List<LineaVenta> lineas, List<Cobro> cobros) {
+    public Venta(Long id, EstadoVenta estado, LocalDate fecha, String direccionFiscal, String codigo, Empresa empresa, LocalDate vencimiento, MetodoPago metodoPago, Cliente cliente, List<LineaVenta> lineas, List<Cobro> cobros, ContratoRecurrente contrato) {
         this.id = id;
         this.estado = estado;
         this.fecha = fecha;
         this.direccionFiscal = direccionFiscal;
         this.codigo = codigo;
+        this.empresa = empresa;
         this.vencimiento = vencimiento;
         this.metodoPago = metodoPago;
         this.cliente = cliente;
         this.lineas = lineas;
         this.cobros = cobros;
+        this.contrato = contrato;
     }
+
+    @Autowired
+
 
     public Long getId() {
         return id;
