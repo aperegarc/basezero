@@ -1,12 +1,26 @@
 import { create } from 'zustand';
 
 export interface EmpresaConfig {
+  // Datos empresa
   nombre: string;
   cif: string;
   direccion: string;
   telefono: string;
   email: string;
   web: string;
+  iban: string;
+  // Numeración de documentos
+  prefijoFactura: string;
+  siguienteFactura: number;
+  prefijoPresupuesto: string;
+  siguientePresupuesto: number;
+  prefijoAlbaran: string;
+  siguienteAlbaran: number;
+  ivaPorDefecto: number;
+  diasVencimiento: number;
+  // Textos predeterminados
+  pieFactura: string;
+  condicionesPago: string;
 }
 
 const DEFAULT: EmpresaConfig = {
@@ -16,6 +30,17 @@ const DEFAULT: EmpresaConfig = {
   telefono: '941 000 000',
   email: 'info@miempresa.com',
   web: 'www.miempresa.com',
+  iban: '',
+  prefijoFactura: 'F',
+  siguienteFactura: 1,
+  prefijoPresupuesto: 'P',
+  siguientePresupuesto: 1,
+  prefijoAlbaran: 'A',
+  siguienteAlbaran: 1,
+  ivaPorDefecto: 21,
+  diasVencimiento: 30,
+  pieFactura: 'Gracias por confiar en nosotros.',
+  condicionesPago: 'Pago a 30 días mediante transferencia bancaria.',
 };
 
 interface EmpresaStore {

@@ -55,6 +55,7 @@ public class VentaService {
         venta.setCodigo(dto.getCodigo());
         venta.setVencimiento(dto.getVencimiento());
         venta.setMetodoPago(dto.getMetodoPago());
+        if (dto.getTipo() != null) venta.setTipo(dto.getTipo());
 
         if (dto.getLineas() != null) {
             for (LineaVentaDTO l : dto.getLineas()) {
@@ -85,6 +86,7 @@ public class VentaService {
         venta.setDireccionFiscal(dto.getDireccionFiscal());
         venta.setVencimiento(dto.getVencimiento());
         venta.setMetodoPago(dto.getMetodoPago());
+        if (dto.getTipo() != null) venta.setTipo(dto.getTipo());
 
         venta.getLineas().clear();
         if (dto.getLineas() != null) {
@@ -119,6 +121,7 @@ public class VentaService {
         dto.setVencimiento(v.getVencimiento());
         dto.setDireccionFiscal(v.getDireccionFiscal());
         dto.setMetodoPago(v.getMetodoPago());
+        dto.setTipo(v.getTipo() != null ? v.getTipo() : com.basezero.basezero.enums.TipoDocumento.FACTURA);
         dto.setClienteId(v.getCliente().getId());
         dto.setClienteNombre(v.getCliente().getNombre());
         dto.setLineas(v.getLineas().stream().map(this::lineaToDTO).collect(Collectors.toList()));

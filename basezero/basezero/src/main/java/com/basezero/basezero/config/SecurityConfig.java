@@ -23,6 +23,9 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import org.springframework.beans.factory.annotation.Value;
+
+import java.util.ArrayList;
 import java.util.List;
 
 @Configuration
@@ -33,6 +36,9 @@ public class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
     private final RateLimitFilter rateLimitFilter;
+
+    @Value("${app.cors.allowed-origins:}")
+    private String allowedOriginsEnv;
 
     @Autowired
     public SecurityConfig(JwtAuthFilter jwtAuthFilter,
@@ -49,30 +55,22 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        // Archivos estáticos del frontend
-                        .requestMatchers(
-                                "/",
-                                "/index.html",
-                                "/assets/**",
-                                "/*.js",
-                                "/*.css",
-                                "/*.ico",
-                                "/*.png",
-                                "/*.svg",
-                                "/*.webp",
-                                "/*.woff",
-                                "/*.woff2"
-                        ).permitAll()
-                        // API pública
+                        // API pública (debe ir antes que los matchers protegidos)
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/empleados/auth/**").permitAll()
                         .requestMatchers("/api/empresas/registro").permitAll()
-                        // API protegida
+                        // API protegida — solo estas rutas requieren autenticación
                         .requestMatchers("/api/usuarios/**").hasRole("ADMINISTRADOR")
+                        .requestMatchers("/api/admin/**").hasRole("ADMINISTRADOR")
+                        .requestMatchers("/api/clientes/**").authenticated()
+                        .requestMatchers("/api/ventas/**").authenticated()
+                        .requestMatchers("/api/cobros/**").authenticated()
+                        .requestMatchers("/api/contratos/**").authenticated()
                         .requestMatchers("/api/empleados/**").authenticated()
                         .requestMatchers("/api/tareas/**").authenticated()
                         .requestMatchers("/api/turnos/**").authenticated()
-                        .anyRequest().authenticated()
+                        // Todo lo demás: frontend estático, SPA routes
+                        .anyRequest().permitAll()
                 )
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
@@ -85,10 +83,14 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
-                "http://localhost:5173",
-                "https://basezero-production.up.railway.app"
-        ));
+
+        List<String> origins = new ArrayList<>(List.of("http://localhost:5173"));
+        if (allowedOriginsEnv != null && !allowedOriginsEnv.isBlank()) {
+            for (String origin : allowedOriginsEnv.split(",")) {
+                origins.add(origin.trim());
+            }
+        }
+        config.setAllowedOrigins(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

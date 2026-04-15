@@ -2,6 +2,7 @@ package com.basezero.basezero.dto.venta;
 
 import com.basezero.basezero.enums.EstadoVenta;
 import com.basezero.basezero.enums.MetodoPago;
+import com.basezero.basezero.enums.TipoDocumento;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -17,6 +18,7 @@ public class VentaResponseDTO {
     private Long clienteId;
     private String clienteNombre;
     private List<LineaVentaDTO> lineas;
+    private TipoDocumento tipo;
     private Long contratoId;
 
 
@@ -42,6 +44,8 @@ public class VentaResponseDTO {
     public void setClienteNombre(String clienteNombre) { this.clienteNombre = clienteNombre; }
     public List<LineaVentaDTO> getLineas() { return lineas; }
     public void setLineas(List<LineaVentaDTO> lineas) { this.lineas = lineas; }
+    public TipoDocumento getTipo() { return tipo; }
+    public void setTipo(TipoDocumento tipo) { this.tipo = tipo; }
     public Long getContratoId() { return contratoId; }
     public void setContratoId(Long contratoId) { this.contratoId = contratoId; }
 }

@@ -11,6 +11,9 @@ public class CobroResponseDTO {
     private LocalDate fecha;
     private MetodoPago metodoPago;
     private Long ventaId;
+    private String ventaCodigo;
+    private String clienteNombre;
+    private BigDecimal ventaTotal;
 
     // Metadata: solo visible para ADMINISTRADOR/GESTOR
     private Long usuarioId;
@@ -28,6 +31,12 @@ public class CobroResponseDTO {
     public void setMetodoPago(MetodoPago metodoPago) { this.metodoPago = metodoPago; }
     public Long getVentaId() { return ventaId; }
     public void setVentaId(Long ventaId) { this.ventaId = ventaId; }
+    public String getVentaCodigo() { return ventaCodigo; }
+    public void setVentaCodigo(String ventaCodigo) { this.ventaCodigo = ventaCodigo; }
+    public String getClienteNombre() { return clienteNombre; }
+    public void setClienteNombre(String clienteNombre) { this.clienteNombre = clienteNombre; }
+    public BigDecimal getVentaTotal() { return ventaTotal; }
+    public void setVentaTotal(BigDecimal ventaTotal) { this.ventaTotal = ventaTotal; }
     public Long getUsuarioId() { return usuarioId; }
     public void setUsuarioId(Long usuarioId) { this.usuarioId = usuarioId; }
     public String getUsuarioNombre() { return usuarioNombre; }

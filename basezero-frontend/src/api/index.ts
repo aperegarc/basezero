@@ -5,7 +5,7 @@ let isRefreshing = false;
 let failedQueue: any[] = [];
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080/api',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
 });
@@ -46,7 +46,7 @@ api.interceptors.response.use(
 
       try {
         // Pedir nuevo access token con la cookie HttpOnly
-        const res = await axios.post('http://localhost:8080/api/auth/refresh',
+        const res = await axios.post('/api/auth/refresh',
           {}, { withCredentials: true });
 
         const newToken = res.data.token;

@@ -2,6 +2,7 @@ package com.basezero.basezero.entity;
 
 import com.basezero.basezero.enums.EstadoVenta;
 import com.basezero.basezero.enums.MetodoPago;
+import com.basezero.basezero.enums.TipoDocumento;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,10 @@ public class Venta {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Enumerated(EnumType.STRING)
+    @Column(columnDefinition = "VARCHAR(255) DEFAULT 'FACTURA'")
+    private TipoDocumento tipo = TipoDocumento.FACTURA;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -62,8 +67,9 @@ public class Venta {
     }
 
 
-    public Venta(Long id, EstadoVenta estado, LocalDate fecha, String direccionFiscal, String codigo, Empresa empresa, LocalDate vencimiento, MetodoPago metodoPago, Cliente cliente, List<LineaVenta> lineas, List<Cobro> cobros, ContratoRecurrente contrato) {
+    public Venta(Long id, TipoDocumento tipo, EstadoVenta estado, LocalDate fecha, String direccionFiscal, String codigo, Empresa empresa, LocalDate vencimiento, MetodoPago metodoPago, Cliente cliente, List<LineaVenta> lineas, List<Cobro> cobros, ContratoRecurrente contrato) {
         this.id = id;
+        this.tipo = tipo != null ? tipo : TipoDocumento.FACTURA;
         this.estado = estado;
         this.fecha = fecha;
         this.direccionFiscal = direccionFiscal;
@@ -79,6 +85,9 @@ public class Venta {
 
     @Autowired
 
+
+    public TipoDocumento getTipo() { return tipo; }
+    public void setTipo(TipoDocumento tipo) { this.tipo = tipo != null ? tipo : TipoDocumento.FACTURA; }
 
     public Long getId() {
         return id;

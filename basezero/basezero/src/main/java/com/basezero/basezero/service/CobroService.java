@@ -109,7 +109,23 @@ public class CobroService {
         dto.setCantidad(c.getCantidad());
         dto.setFecha(c.getFecha());
         dto.setMetodoPago(c.getMetodoPago());
-        dto.setVentaId(c.getVenta() != null ? c.getVenta().getId() : null);
+
+        if (c.getVenta() != null) {
+            Venta v = c.getVenta();
+            dto.setVentaId(v.getId());
+            dto.setVentaCodigo(v.getCodigo());
+            if (v.getCliente() != null) {
+                dto.setClienteNombre(v.getCliente().getNombre());
+            }
+            // Calcular total de la venta desde las líneas
+            if (v.getLineas() != null) {
+                BigDecimal total = v.getLineas().stream()
+                        .map(LineaVenta::getTotal)
+                        .filter(t -> t != null)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                dto.setVentaTotal(total);
+            }
+        }
 
         // Metadata: solo ADMINISTRADOR o GESTOR ven quién realizó el cobro
         if (EmpresaContext.puedeVerMetadata() && c.getUsuario() != null) {

@@ -38,6 +38,7 @@ export interface Venta {
   fecha: string;
   vencimiento: string;
   estado: 'PENDIENTE' | 'COBRADO' | 'ANULADA';
+  tipo: 'FACTURA' | 'PRESUPUESTO' | 'ALBARAN';
   metodoPago: string;
   direccionFiscal: string;
   clienteId: number;

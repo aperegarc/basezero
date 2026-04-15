@@ -41,8 +41,8 @@ export default function App() {
           <Route path="usuarios" element={<RoleRoute allowedRoles={['ADMINISTRADOR']}><UsuariosPage /></RoleRoute>} />
           <Route path="config" element={<RoleRoute allowedRoles={['ADMINISTRADOR']}><ConfigPage /></RoleRoute>} />
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
         <Route path="/registro" element={<RegistroPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

@@ -2,6 +2,7 @@ package com.basezero.basezero.dto.venta;
 
 import com.basezero.basezero.enums.EstadoVenta;
 import com.basezero.basezero.enums.MetodoPago;
+import com.basezero.basezero.enums.TipoDocumento;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.util.List;
@@ -19,6 +20,7 @@ public class VentaRequestDTO {
     private String codigo;
     private LocalDate vencimiento;
     private MetodoPago metodoPago;
+    private TipoDocumento tipo = TipoDocumento.FACTURA;
     private List<LineaVentaDTO> lineas;
 
     public VentaRequestDTO() {}
@@ -38,5 +40,7 @@ public class VentaRequestDTO {
     public MetodoPago getMetodoPago() { return metodoPago; }
     public void setMetodoPago(MetodoPago metodoPago) { this.metodoPago = metodoPago; }
     public List<LineaVentaDTO> getLineas() { return lineas; }
+    public TipoDocumento getTipo() { return tipo; }
+    public void setTipo(TipoDocumento tipo) { this.tipo = tipo; }
     public void setLineas(List<LineaVentaDTO> lineas) { this.lineas = lineas; }
 }
