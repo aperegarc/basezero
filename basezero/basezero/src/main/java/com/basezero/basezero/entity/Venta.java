@@ -4,8 +4,7 @@ import com.basezero.basezero.enums.EstadoVenta;
 import com.basezero.basezero.enums.MetodoPago;
 import com.basezero.basezero.enums.TipoDocumento;
 import jakarta.persistence.*;
-import lombok.*;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.Builder;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -22,11 +21,12 @@ public class Venta {
     private Long id;
 
     @Enumerated(EnumType.STRING)
-    @Column(columnDefinition = "VARCHAR(255) DEFAULT 'FACTURA'")
+    @Column(nullable = false, length = 32)
+    @Builder.Default
     private TipoDocumento tipo = TipoDocumento.FACTURA;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 32)
     private EstadoVenta estado;
 
     @Column(nullable = false)
@@ -44,6 +44,7 @@ public class Venta {
     private LocalDate vencimiento;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 32)
     private MetodoPago metodoPago;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -62,12 +63,16 @@ public class Venta {
     @JoinColumn(name = "contrato_id")
     private ContratoRecurrente contrato;
 
-    @Autowired
     public Venta() {
+        this.lineas = new ArrayList<>();
+        this.cobros = new ArrayList<>();
+        this.tipo = TipoDocumento.FACTURA;
     }
 
-
-    public Venta(Long id, TipoDocumento tipo, EstadoVenta estado, LocalDate fecha, String direccionFiscal, String codigo, Empresa empresa, LocalDate vencimiento, MetodoPago metodoPago, Cliente cliente, List<LineaVenta> lineas, List<Cobro> cobros, ContratoRecurrente contrato) {
+    public Venta(Long id, TipoDocumento tipo, EstadoVenta estado, LocalDate fecha,
+                 String direccionFiscal, String codigo, Empresa empresa, LocalDate vencimiento,
+                 MetodoPago metodoPago, Cliente cliente, List<LineaVenta> lineas,
+                 List<Cobro> cobros, ContratoRecurrente contrato) {
         this.id = id;
         this.tipo = tipo != null ? tipo : TipoDocumento.FACTURA;
         this.estado = estado;
@@ -78,102 +83,57 @@ public class Venta {
         this.vencimiento = vencimiento;
         this.metodoPago = metodoPago;
         this.cliente = cliente;
-        this.lineas = lineas;
-        this.cobros = cobros;
+        this.lineas = lineas != null ? lineas : new ArrayList<>();
+        this.cobros = cobros != null ? cobros : new ArrayList<>();
         this.contrato = contrato;
     }
-
-    @Autowired
-
 
     public TipoDocumento getTipo() { return tipo; }
     public void setTipo(TipoDocumento tipo) { this.tipo = tipo != null ? tipo : TipoDocumento.FACTURA; }
 
-    public Long getId() {
-        return id;
-    }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+    public EstadoVenta getEstado() { return estado; }
+    public void setEstado(EstadoVenta estado) { this.estado = estado; }
 
-    public EstadoVenta getEstado() {
-        return estado;
-    }
+    public LocalDate getFecha() { return fecha; }
+    public void setFecha(LocalDate fecha) { this.fecha = fecha; }
 
-    public void setEstado(EstadoVenta estado) {
-        this.estado = estado;
-    }
+    public String getDireccionFiscal() { return direccionFiscal; }
+    public void setDireccionFiscal(String direccionFiscal) { this.direccionFiscal = direccionFiscal; }
 
-    public LocalDate getFecha() {
-        return fecha;
-    }
+    public String getCodigo() { return codigo; }
+    public void setCodigo(String codigo) { this.codigo = codigo; }
 
-    public void setFecha(LocalDate fecha) {
-        this.fecha = fecha;
-    }
+    public LocalDate getVencimiento() { return vencimiento; }
+    public void setVencimiento(LocalDate vencimiento) { this.vencimiento = vencimiento; }
 
-    public String getDireccionFiscal() {
-        return direccionFiscal;
-    }
+    public MetodoPago getMetodoPago() { return metodoPago; }
+    public void setMetodoPago(MetodoPago metodoPago) { this.metodoPago = metodoPago; }
 
-    public void setDireccionFiscal(String direccionFiscal) {
-        this.direccionFiscal = direccionFiscal;
-    }
-
-    public String getCodigo() {
-        return codigo;
-    }
-
-    public void setCodigo(String codigo) {
-        this.codigo = codigo;
-    }
-
-    public LocalDate getVencimiento() {
-        return vencimiento;
-    }
-
-    public void setVencimiento(LocalDate vencimiento) {
-        this.vencimiento = vencimiento;
-    }
-
-    public MetodoPago getMetodoPago() {
-        return metodoPago;
-    }
-
-    public void setMetodoPago(MetodoPago metodoPago) {
-        this.metodoPago = metodoPago;
-    }
-
-    public Cliente getCliente() {
-        return cliente;
-    }
-
-    public void setCliente(Cliente cliente) {
-        this.cliente = cliente;
-    }
+    public Cliente getCliente() { return cliente; }
+    public void setCliente(Cliente cliente) { this.cliente = cliente; }
 
     public List<LineaVenta> getLineas() {
+        if (lineas == null) lineas = new ArrayList<>();
         return lineas;
     }
-
     public void setLineas(List<LineaVenta> lineas) {
-        this.lineas = lineas;
+        this.lineas = lineas != null ? lineas : new ArrayList<>();
     }
 
     public List<Cobro> getCobros() {
+        if (cobros == null) cobros = new ArrayList<>();
         return cobros;
     }
-
     public void setCobros(List<Cobro> cobros) {
-        this.cobros = cobros;
+        this.cobros = cobros != null ? cobros : new ArrayList<>();
     }
 
     public ContratoRecurrente getContrato() { return contrato; }
-
     public void setContrato(ContratoRecurrente contrato) { this.contrato = contrato; }
 
     public Empresa getEmpresa() { return empresa; }
-
     public void setEmpresa(Empresa empresa) { this.empresa = empresa; }
 }

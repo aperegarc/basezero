@@ -2,8 +2,7 @@ package com.basezero.basezero.entity;
 
 
 import jakarta.persistence.*;
-import lombok.*;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.Builder;
 
 import java.math.BigDecimal;
 
@@ -43,11 +42,9 @@ public class LineaVenta {
     @JoinColumn(name = "venta_id", nullable = false)
     private Venta venta;
 
-    @Autowired
     public LineaVenta() {
     }
 
-    @Autowired
     public LineaVenta(Long id, String producto, String nombre, String descripcion, Integer unidades, BigDecimal precio, BigDecimal descuento, BigDecimal iva, BigDecimal total, Venta venta) {
         this.id = id;
         this.producto = producto;

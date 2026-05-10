@@ -3,6 +3,7 @@ package com.basezero.basezero.dto.venta;
 import com.basezero.basezero.enums.EstadoVenta;
 import com.basezero.basezero.enums.MetodoPago;
 import com.basezero.basezero.enums.TipoDocumento;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -20,6 +21,9 @@ public class VentaResponseDTO {
     private List<LineaVentaDTO> lineas;
     private TipoDocumento tipo;
     private Long contratoId;
+    private BigDecimal base;
+    private BigDecimal ivaTotal;
+    private BigDecimal total;
 
 
     public VentaResponseDTO() {}
@@ -48,4 +52,10 @@ public class VentaResponseDTO {
     public void setTipo(TipoDocumento tipo) { this.tipo = tipo; }
     public Long getContratoId() { return contratoId; }
     public void setContratoId(Long contratoId) { this.contratoId = contratoId; }
+    public BigDecimal getBase() { return base; }
+    public void setBase(BigDecimal base) { this.base = base; }
+    public BigDecimal getIvaTotal() { return ivaTotal; }
+    public void setIvaTotal(BigDecimal ivaTotal) { this.ivaTotal = ivaTotal; }
+    public BigDecimal getTotal() { return total; }
+    public void setTotal(BigDecimal total) { this.total = total; }
 }

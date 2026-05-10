@@ -45,6 +45,8 @@ export interface Venta {
   clienteNombre?: string;
   contratoId?: number;
   lineas: LineaVenta[];
+  base?: number;
+  ivaTotal?: number;
   total?: number;
 }
 

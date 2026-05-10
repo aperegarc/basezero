@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { getTurnos, getTurnosByEmpleado, createTurno, updateTurno, deleteTurno, getEmpleados } from '../api';
+import { getTurnos, getTurnosByEmpleado, createTurno, updateTurno, deleteTurno, getEmpleados, aplicarPlantillaTurnos, copiarSemanaTurnos } from '../api';
+import type { DiaSemana } from '../api';
 import { useAuthStore } from '../store/authStore';
 
 interface Turno {
@@ -13,6 +14,54 @@ interface Turno {
 }
 
 const EMPTY = { empleadoId: 0, fecha: new Date().toISOString().slice(0, 10), horaEntrada: '09:00', horaSalida: '17:00', notas: '' };
+
+const DIAS_SEMANA: { key: DiaSemana; label: string; corto: string }[] = [
+  { key: 'MONDAY',    label: 'Lunes',     corto: 'L' },
+  { key: 'TUESDAY',   label: 'Martes',    corto: 'M' },
+  { key: 'WEDNESDAY', label: 'Miércoles', corto: 'X' },
+  { key: 'THURSDAY',  label: 'Jueves',    corto: 'J' },
+  { key: 'FRIDAY',    label: 'Viernes',   corto: 'V' },
+  { key: 'SATURDAY',  label: 'Sábado',    corto: 'S' },
+  { key: 'SUNDAY',    label: 'Domingo',   corto: 'D' },
+];
+
+type HorarioPorDia = Record<DiaSemana, { activo: boolean; entrada: string; salida: string }>;
+
+const HORARIO_DEFAULT: HorarioPorDia = {
+  MONDAY:    { activo: true,  entrada: '09:00', salida: '17:00' },
+  TUESDAY:   { activo: true,  entrada: '09:00', salida: '17:00' },
+  WEDNESDAY: { activo: true,  entrada: '09:00', salida: '17:00' },
+  THURSDAY:  { activo: true,  entrada: '09:00', salida: '17:00' },
+  FRIDAY:    { activo: true,  entrada: '09:00', salida: '17:00' },
+  SATURDAY:  { activo: false, entrada: '09:00', salida: '14:00' },
+  SUNDAY:    { activo: false, entrada: '09:00', salida: '14:00' },
+};
+
+const PLANT_EMPTY = {
+  empleadoIds: [] as number[],
+  fechaInicio: new Date().toISOString().slice(0, 10),
+  fechaFin: new Date(Date.now() + 27 * 86400000).toISOString().slice(0, 10),
+  horarios: { ...HORARIO_DEFAULT } as HorarioPorDia,
+  notas: '',
+  evitarDuplicados: true,
+  sobrescribir: false,
+};
+
+function lunesDe(fecha: string): string {
+  const d = new Date(fecha + 'T00:00:00');
+  const dia = d.getDay();
+  const diff = dia === 0 ? -6 : 1 - dia;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
+const COPY_EMPTY = {
+  empleadoIds: [] as number[],
+  semanaOrigen: lunesDe(new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)),
+  semanaDestino: lunesDe(new Date().toISOString().slice(0, 10)),
+  repetirSemanas: 1,
+  evitarDuplicados: true,
+};
 
 function calcHoras(entrada: string, salida: string): string {
   try {
@@ -29,6 +78,10 @@ export default function TurnosPage() {
   const [empleados, setEmpleados] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
+  const [plantModal, setPlantModal] = useState(false);
+  const [copyModal, setCopyModal] = useState(false);
+  const [plantForm, setPlantForm] = useState(PLANT_EMPTY);
+  const [copyForm, setCopyForm] = useState(COPY_EMPTY);
   const [editing, setEditing] = useState<number | null>(null);
   const [form, setForm] = useState<any>(EMPTY);
   const [saving, setSaving] = useState(false);
@@ -80,6 +133,110 @@ export default function TurnosPage() {
     if (!confirm('¿Eliminar este turno?')) return;
     try { await deleteTurno(id); showToast('Turno eliminado'); await load(); }
     catch { showToast('Error al eliminar', 'err'); }
+  };
+
+  // --------- Plantilla semanal ---------
+  const togglePlantEmpleado = (id: number) => {
+    setPlantForm(p => ({
+      ...p,
+      empleadoIds: p.empleadoIds.includes(id)
+        ? p.empleadoIds.filter(e => e !== id)
+        : [...p.empleadoIds, id]
+    }));
+  };
+
+  const setHorarioDia = (dia: DiaSemana, cambios: Partial<{ activo: boolean; entrada: string; salida: string }>) => {
+    setPlantForm(p => ({ ...p, horarios: { ...p.horarios, [dia]: { ...p.horarios[dia], ...cambios } } }));
+  };
+
+  const aplicarPresetHorario = (preset: 'lv9-17' | 'ls-mananas' | 'ls-tardes' | 'limpiar') => {
+    const base: HorarioPorDia = {
+      MONDAY:    { activo: false, entrada: '09:00', salida: '17:00' },
+      TUESDAY:   { activo: false, entrada: '09:00', salida: '17:00' },
+      WEDNESDAY: { activo: false, entrada: '09:00', salida: '17:00' },
+      THURSDAY:  { activo: false, entrada: '09:00', salida: '17:00' },
+      FRIDAY:    { activo: false, entrada: '09:00', salida: '17:00' },
+      SATURDAY:  { activo: false, entrada: '09:00', salida: '14:00' },
+      SUNDAY:    { activo: false, entrada: '09:00', salida: '14:00' },
+    };
+    if (preset === 'lv9-17') {
+      (['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY'] as DiaSemana[]).forEach(d => base[d] = { activo: true, entrada: '09:00', salida: '17:00' });
+    } else if (preset === 'ls-mananas') {
+      (['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'] as DiaSemana[]).forEach(d => base[d] = { activo: true, entrada: '08:00', salida: '14:00' });
+    } else if (preset === 'ls-tardes') {
+      (['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'] as DiaSemana[]).forEach(d => base[d] = { activo: true, entrada: '15:00', salida: '21:00' });
+    }
+    setPlantForm(p => ({ ...p, horarios: base }));
+  };
+
+  const totalTurnosPlant = (() => {
+    if (!plantForm.fechaInicio || !plantForm.fechaFin || plantForm.empleadoIds.length === 0) return 0;
+    const inicio = new Date(plantForm.fechaInicio + 'T00:00:00');
+    const fin = new Date(plantForm.fechaFin + 'T00:00:00');
+    if (fin < inicio) return 0;
+    const diasMap: Record<number, DiaSemana> = { 0: 'SUNDAY', 1: 'MONDAY', 2: 'TUESDAY', 3: 'WEDNESDAY', 4: 'THURSDAY', 5: 'FRIDAY', 6: 'SATURDAY' };
+    let dias = 0;
+    for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) {
+      if (plantForm.horarios[diasMap[d.getDay()]].activo) dias++;
+    }
+    return dias * plantForm.empleadoIds.length;
+  })();
+
+  const handleAplicarPlantilla = async () => {
+    if (plantForm.empleadoIds.length === 0) { showToast('Selecciona al menos un empleado', 'err'); return; }
+    const horarios = (Object.keys(plantForm.horarios) as DiaSemana[])
+      .filter(d => plantForm.horarios[d].activo)
+      .map(d => ({ diaSemana: d, horaEntrada: plantForm.horarios[d].entrada, horaSalida: plantForm.horarios[d].salida }));
+    if (horarios.length === 0) { showToast('Activa al menos un día de la semana', 'err'); return; }
+    if (new Date(plantForm.fechaFin) < new Date(plantForm.fechaInicio)) { showToast('La fecha fin no puede ser anterior a la inicio', 'err'); return; }
+    if (plantForm.sobrescribir && !confirm(`¿Borrar todos los turnos del rango para ${plantForm.empleadoIds.length} empleado(s) y reemplazarlos?`)) return;
+
+    setSaving(true);
+    try {
+      const res = await aplicarPlantillaTurnos({
+        empleadoIds: plantForm.empleadoIds,
+        fechaInicio: plantForm.fechaInicio,
+        fechaFin: plantForm.fechaFin,
+        horarios,
+        notas: plantForm.notas,
+        evitarDuplicados: plantForm.evitarDuplicados,
+        sobrescribir: plantForm.sobrescribir,
+      });
+      const { totalCreados, totalOmitidos, totalFallidos } = res.data;
+      const partes = [`${totalCreados} creados`];
+      if (totalOmitidos) partes.push(`${totalOmitidos} omitidos`);
+      if (totalFallidos) partes.push(`${totalFallidos} con error`);
+      showToast(partes.join(' · '), totalFallidos ? 'err' : 'ok');
+      setPlantModal(false);
+      await load();
+    } catch { showToast('Error al aplicar plantilla', 'err'); }
+    finally { setSaving(false); }
+  };
+
+  // --------- Copiar semana ---------
+  const toggleCopyEmpleado = (id: number) => {
+    setCopyForm(p => ({
+      ...p,
+      empleadoIds: p.empleadoIds.includes(id)
+        ? p.empleadoIds.filter(e => e !== id)
+        : [...p.empleadoIds, id]
+    }));
+  };
+
+  const handleCopiarSemana = async () => {
+    if (copyForm.empleadoIds.length === 0) { showToast('Selecciona al menos un empleado', 'err'); return; }
+    if (copyForm.repetirSemanas < 1) { showToast('Repetir semanas debe ser al menos 1', 'err'); return; }
+    setSaving(true);
+    try {
+      const res = await copiarSemanaTurnos(copyForm);
+      const { totalCreados, totalOmitidos } = res.data;
+      const partes = [`${totalCreados} creados`];
+      if (totalOmitidos) partes.push(`${totalOmitidos} omitidos`);
+      showToast(partes.join(' · ') + (totalCreados === 0 ? ' (la semana origen no tiene turnos)' : ''));
+      setCopyModal(false);
+      await load();
+    } catch { showToast('Error al copiar semana', 'err'); }
+    finally { setSaving(false); }
   };
 
   const filtered = turnos.filter(t => {
@@ -150,7 +307,11 @@ export default function TurnosPage() {
           <input type="date" value={filtroFecha} onChange={e => setFiltroFecha(e.target.value)} style={{ padding: '.42rem .8rem', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: '.73rem', color: '#2D3748', background: '#fff', outline: 'none', cursor: 'pointer' }} />
           {filtroFecha && <button onClick={() => setFiltroFecha('')} style={{ padding: '.42rem .6rem', borderRadius: 8, border: '1px solid #E2E8F0', background: '#fff', cursor: 'pointer', fontSize: '.7rem', color: '#718096' }}>✕ Limpiar</button>}
           {user?.rol !== 'EMPLEADO' && (
-            <button onClick={openNew} style={{ padding: '.48rem .95rem', borderRadius: 7, border: 'none', background: '#00B4D8', cursor: 'pointer', fontSize: '.73rem', fontWeight: 700, color: '#0D1B2A' }}>＋ Añadir turno</button>
+            <>
+              <button onClick={() => { setCopyForm({ ...COPY_EMPTY }); setCopyModal(true); }} style={{ padding: '.48rem .95rem', borderRadius: 7, border: '1px solid #E2E8F0', background: '#fff', cursor: 'pointer', fontSize: '.73rem', fontWeight: 700, color: '#2D3748' }}>📑 Copiar semana</button>
+              <button onClick={() => { setPlantForm({ ...PLANT_EMPTY, horarios: { ...HORARIO_DEFAULT } }); setPlantModal(true); }} style={{ padding: '.48rem .95rem', borderRadius: 7, border: '1px solid #00B4D8', background: '#fff', cursor: 'pointer', fontSize: '.73rem', fontWeight: 700, color: '#0090B0' }}>📋 Plantilla semanal</button>
+              <button onClick={openNew} style={{ padding: '.48rem .95rem', borderRadius: 7, border: 'none', background: '#00B4D8', cursor: 'pointer', fontSize: '.73rem', fontWeight: 700, color: '#0D1B2A' }}>＋ Añadir turno</button>
+            </>
           )}
         </div>
       </div>
@@ -245,6 +406,175 @@ export default function TurnosPage() {
               <button onClick={() => setModal(false)} style={{ padding: '.48rem .95rem', borderRadius: 7, border: '1px solid #E2E8F0', background: '#F8FAFC', cursor: 'pointer', fontSize: '.73rem', fontWeight: 700, color: '#2D3748' }}>Cancelar</button>
               <button onClick={handleSave} disabled={saving} style={{ padding: '.48rem .95rem', borderRadius: 7, border: 'none', background: '#00B4D8', cursor: saving ? 'not-allowed' : 'pointer', fontSize: '.73rem', fontWeight: 700, color: '#0D1B2A', opacity: saving ? .7 : 1 }}>
                 {saving ? 'Guardando...' : editing ? 'Actualizar' : 'Crear turno'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal plantilla semanal */}
+      {plantModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 720, maxHeight: '92vh', overflowY: 'auto' }}>
+            <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <span style={{ fontWeight: 800, fontSize: '.85rem', color: '#1A202C' }}>Plantilla semanal de turnos</span>
+                <div style={{ fontSize: '.65rem', color: '#718096', marginTop: '.2rem' }}>Genera turnos para varios empleados durante un rango de fechas</div>
+              </div>
+              <button onClick={() => setPlantModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: '#718096' }}>✕</button>
+            </div>
+            <div style={{ padding: '1.5rem', display: 'grid', gap: '1rem' }}>
+
+              {/* Empleados */}
+              <div>
+                <label style={labelStyle}>Empleados * <span style={{ color: '#A0AEC0', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>({plantForm.empleadoIds.length} seleccionados)</span></label>
+                <div style={{ border: '1px solid #E2E8F0', borderRadius: 8, padding: '.5rem', maxHeight: 130, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '.3rem' }}>
+                  {empleados.filter(e => e.activo).length === 0 && (
+                    <div style={{ padding: '.5rem', fontSize: '.7rem', color: '#A0AEC0' }}>No hay empleados activos</div>
+                  )}
+                  {empleados.filter(e => e.activo).map(e => (
+                    <label key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '.4rem', padding: '.3rem .5rem', borderRadius: 6, background: plantForm.empleadoIds.includes(e.id) ? 'rgba(0,180,216,.08)' : 'transparent', cursor: 'pointer', fontSize: '.72rem', color: '#2D3748' }}>
+                      <input type="checkbox" checked={plantForm.empleadoIds.includes(e.id)} onChange={() => togglePlantEmpleado(e.id)} style={{ accentColor: '#00B4D8' }} />
+                      {e.nombre}
+                    </label>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '.4rem', marginTop: '.4rem' }}>
+                  <button onClick={() => setPlantForm(p => ({ ...p, empleadoIds: empleados.filter(e => e.activo).map(e => e.id) }))} style={{ padding: '.25rem .55rem', fontSize: '.62rem', fontWeight: 700, color: '#0090B0', background: 'rgba(0,180,216,.08)', border: 'none', borderRadius: 5, cursor: 'pointer' }}>Todos</button>
+                  <button onClick={() => setPlantForm(p => ({ ...p, empleadoIds: [] }))} style={{ padding: '.25rem .55rem', fontSize: '.62rem', fontWeight: 700, color: '#718096', background: '#F1F5F9', border: 'none', borderRadius: 5, cursor: 'pointer' }}>Ninguno</button>
+                </div>
+              </div>
+
+              {/* Rango */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.8rem' }}>
+                <div>
+                  <label style={labelStyle}>Fecha inicio *</label>
+                  <input type="date" value={plantForm.fechaInicio} onChange={e => setPlantForm({ ...plantForm, fechaInicio: e.target.value })} style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Fecha fin *</label>
+                  <input type="date" value={plantForm.fechaFin} onChange={e => setPlantForm({ ...plantForm, fechaFin: e.target.value })} style={inputStyle} />
+                </div>
+              </div>
+
+              {/* Presets */}
+              <div>
+                <label style={labelStyle}>Presets de horario</label>
+                <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+                  <button onClick={() => aplicarPresetHorario('lv9-17')} style={{ padding: '.3rem .65rem', fontSize: '.65rem', fontWeight: 700, color: '#0090B0', background: 'rgba(0,180,216,.08)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>L-V · 9-17h</button>
+                  <button onClick={() => aplicarPresetHorario('ls-mananas')} style={{ padding: '.3rem .65rem', fontSize: '.65rem', fontWeight: 700, color: '#0090B0', background: 'rgba(0,180,216,.08)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>L-S · Mañanas (8-14h)</button>
+                  <button onClick={() => aplicarPresetHorario('ls-tardes')} style={{ padding: '.3rem .65rem', fontSize: '.65rem', fontWeight: 700, color: '#0090B0', background: 'rgba(0,180,216,.08)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>L-S · Tardes (15-21h)</button>
+                  <button onClick={() => aplicarPresetHorario('limpiar')} style={{ padding: '.3rem .65rem', fontSize: '.65rem', fontWeight: 700, color: '#718096', background: '#F1F5F9', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Limpiar</button>
+                </div>
+              </div>
+
+              {/* Horarios por día */}
+              <div>
+                <label style={labelStyle}>Horarios por día</label>
+                <div style={{ border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
+                  {DIAS_SEMANA.map((d, idx) => {
+                    const h = plantForm.horarios[d.key];
+                    return (
+                      <div key={d.key} style={{ display: 'grid', gridTemplateColumns: 'auto 110px 1fr 1fr', gap: '.6rem', alignItems: 'center', padding: '.5rem .8rem', background: idx % 2 ? '#F8FAFC' : '#fff', borderBottom: idx < DIAS_SEMANA.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
+                        <input type="checkbox" checked={h.activo} onChange={e => setHorarioDia(d.key, { activo: e.target.checked })} style={{ accentColor: '#00B4D8' }} />
+                        <span style={{ fontSize: '.73rem', fontWeight: 700, color: h.activo ? '#1A202C' : '#A0AEC0' }}>{d.label}</span>
+                        <input type="time" value={h.entrada} disabled={!h.activo} onChange={e => setHorarioDia(d.key, { entrada: e.target.value })} style={{ ...inputStyle, padding: '.35rem .6rem', opacity: h.activo ? 1 : .5 }} />
+                        <input type="time" value={h.salida} disabled={!h.activo} onChange={e => setHorarioDia(d.key, { salida: e.target.value })} style={{ ...inputStyle, padding: '.35rem .6rem', opacity: h.activo ? 1 : .5 }} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Notas</label>
+                <input value={plantForm.notas} onChange={e => setPlantForm({ ...plantForm, notas: e.target.value })} style={inputStyle} />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.72rem', color: '#2D3748', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={plantForm.evitarDuplicados} disabled={plantForm.sobrescribir} onChange={e => setPlantForm({ ...plantForm, evitarDuplicados: e.target.checked })} style={{ accentColor: '#00B4D8' }} />
+                  Omitir duplicados (no crear si ya existe turno para ese empleado y fecha)
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.72rem', color: '#991B1B', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={plantForm.sobrescribir} onChange={e => setPlantForm({ ...plantForm, sobrescribir: e.target.checked })} style={{ accentColor: '#EF4444' }} />
+                  Sobrescribir (BORRA los turnos existentes del rango antes de crear los nuevos)
+                </label>
+              </div>
+
+              <div style={{ background: 'rgba(0,180,216,.06)', border: '1px solid rgba(0,180,216,.2)', borderRadius: 8, padding: '.7rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '.72rem', color: '#0090B0', fontWeight: 600 }}>Turnos que se generarán</span>
+                <span style={{ fontSize: '1rem', fontWeight: 900, color: '#0D1B2A' }}>{totalTurnosPlant}</span>
+              </div>
+            </div>
+            <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '.6rem' }}>
+              <button onClick={() => setPlantModal(false)} style={{ padding: '.48rem .95rem', borderRadius: 7, border: '1px solid #E2E8F0', background: '#F8FAFC', cursor: 'pointer', fontSize: '.73rem', fontWeight: 700, color: '#2D3748' }}>Cancelar</button>
+              <button onClick={handleAplicarPlantilla} disabled={saving || totalTurnosPlant === 0} style={{ padding: '.48rem .95rem', borderRadius: 7, border: 'none', background: '#00B4D8', cursor: (saving || totalTurnosPlant === 0) ? 'not-allowed' : 'pointer', fontSize: '.73rem', fontWeight: 700, color: '#0D1B2A', opacity: (saving || totalTurnosPlant === 0) ? .5 : 1 }}>
+                {saving ? 'Generando...' : `Generar ${totalTurnosPlant} turnos`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal copiar semana */}
+      {copyModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 540, maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <span style={{ fontWeight: 800, fontSize: '.85rem', color: '#1A202C' }}>Copiar semana de turnos</span>
+                <div style={{ fontSize: '.65rem', color: '#718096', marginTop: '.2rem' }}>Replica los turnos de una semana en una o varias siguientes</div>
+              </div>
+              <button onClick={() => setCopyModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: '#718096' }}>✕</button>
+            </div>
+            <div style={{ padding: '1.5rem', display: 'grid', gap: '1rem' }}>
+
+              <div>
+                <label style={labelStyle}>Empleados * <span style={{ color: '#A0AEC0', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>({copyForm.empleadoIds.length} seleccionados)</span></label>
+                <div style={{ border: '1px solid #E2E8F0', borderRadius: 8, padding: '.5rem', maxHeight: 130, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '.3rem' }}>
+                  {empleados.filter(e => e.activo).map(e => (
+                    <label key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '.4rem', padding: '.3rem .5rem', borderRadius: 6, background: copyForm.empleadoIds.includes(e.id) ? 'rgba(0,180,216,.08)' : 'transparent', cursor: 'pointer', fontSize: '.72rem', color: '#2D3748' }}>
+                      <input type="checkbox" checked={copyForm.empleadoIds.includes(e.id)} onChange={() => toggleCopyEmpleado(e.id)} style={{ accentColor: '#00B4D8' }} />
+                      {e.nombre}
+                    </label>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '.4rem', marginTop: '.4rem' }}>
+                  <button onClick={() => setCopyForm(p => ({ ...p, empleadoIds: empleados.filter(e => e.activo).map(e => e.id) }))} style={{ padding: '.25rem .55rem', fontSize: '.62rem', fontWeight: 700, color: '#0090B0', background: 'rgba(0,180,216,.08)', border: 'none', borderRadius: 5, cursor: 'pointer' }}>Todos</button>
+                  <button onClick={() => setCopyForm(p => ({ ...p, empleadoIds: [] }))} style={{ padding: '.25rem .55rem', fontSize: '.62rem', fontWeight: 700, color: '#718096', background: '#F1F5F9', border: 'none', borderRadius: 5, cursor: 'pointer' }}>Ninguno</button>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.8rem' }}>
+                <div>
+                  <label style={labelStyle}>Semana origen</label>
+                  <input type="date" value={copyForm.semanaOrigen} onChange={e => setCopyForm({ ...copyForm, semanaOrigen: e.target.value })} style={inputStyle} />
+                  <div style={{ fontSize: '.6rem', color: '#A0AEC0', marginTop: '.2rem' }}>Lunes detectado: {lunesDe(copyForm.semanaOrigen)}</div>
+                </div>
+                <div>
+                  <label style={labelStyle}>Semana destino</label>
+                  <input type="date" value={copyForm.semanaDestino} onChange={e => setCopyForm({ ...copyForm, semanaDestino: e.target.value })} style={inputStyle} />
+                  <div style={{ fontSize: '.6rem', color: '#A0AEC0', marginTop: '.2rem' }}>Lunes detectado: {lunesDe(copyForm.semanaDestino)}</div>
+                </div>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Repetir cuántas semanas</label>
+                <input type="number" min={1} max={52} value={copyForm.repetirSemanas} onChange={e => setCopyForm({ ...copyForm, repetirSemanas: Math.max(1, +e.target.value || 1) })} style={inputStyle} />
+                <div style={{ fontSize: '.62rem', color: '#718096', marginTop: '.3rem' }}>1 = solo la semana destino · N = se replica N semanas consecutivas</div>
+              </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.72rem', color: '#2D3748', cursor: 'pointer' }}>
+                <input type="checkbox" checked={copyForm.evitarDuplicados} onChange={e => setCopyForm({ ...copyForm, evitarDuplicados: e.target.checked })} style={{ accentColor: '#00B4D8' }} />
+                Omitir duplicados (no copiar si ya existe turno para ese empleado y fecha)
+              </label>
+
+            </div>
+            <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '.6rem' }}>
+              <button onClick={() => setCopyModal(false)} style={{ padding: '.48rem .95rem', borderRadius: 7, border: '1px solid #E2E8F0', background: '#F8FAFC', cursor: 'pointer', fontSize: '.73rem', fontWeight: 700, color: '#2D3748' }}>Cancelar</button>
+              <button onClick={handleCopiarSemana} disabled={saving || copyForm.empleadoIds.length === 0} style={{ padding: '.48rem .95rem', borderRadius: 7, border: 'none', background: '#00B4D8', cursor: (saving || copyForm.empleadoIds.length === 0) ? 'not-allowed' : 'pointer', fontSize: '.73rem', fontWeight: 700, color: '#0D1B2A', opacity: (saving || copyForm.empleadoIds.length === 0) ? .5 : 1 }}>
+                {saving ? 'Copiando...' : 'Copiar semana'}
               </button>
             </div>
           </div>

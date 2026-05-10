@@ -2,8 +2,7 @@ package com.basezero.basezero.entity;
 
 import com.basezero.basezero.enums.TipoCliente;
 import jakarta.persistence.*;
-import lombok.*;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.Builder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,11 +42,10 @@ public class Cliente {
     @JoinColumn(name = "empresa_id", nullable = false)
     private Empresa empresa;
 
-    @Autowired
     public Cliente() {
+        this.ventas = new ArrayList<>();
     }
 
-    @Autowired
     public Cliente(Long id, String nombre, String cifNif, TipoCliente tipo, String personaContacto,
                    String cargo, String telefono, String email, String direccion,
                    List<Venta> ventas, Empresa empresa) {
@@ -60,7 +58,7 @@ public class Cliente {
         this.telefono = telefono;
         this.email = email;
         this.direccion = direccion;
-        this.ventas = ventas;
+        this.ventas = ventas != null ? ventas : new ArrayList<>();
         this.empresa = empresa;
     }
 
@@ -84,7 +82,12 @@ public class Cliente {
     public void setEmail(String email) { this.email = email; }
     public String getDireccion() { return direccion; }
     public void setDireccion(String direccion) { this.direccion = direccion; }
-    public List<Venta> getVentas() { return ventas; }
-    public void setVentas(List<Venta> ventas) { this.ventas = ventas; }
+    public List<Venta> getVentas() {
+        if (ventas == null) ventas = new ArrayList<>();
+        return ventas;
+    }
+    public void setVentas(List<Venta> ventas) {
+        this.ventas = ventas != null ? ventas : new ArrayList<>();
+    }
 
 }

@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-BasezeroApplication<basezero>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.basezero.basezero.BasezeroApplication",
+            "projectName": "basezero",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}

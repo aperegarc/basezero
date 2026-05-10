@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { getContratos, createContrato, updateContrato, deleteContrato, generarVentaContrato, getClientes } from '../api';
 import type { Cliente } from '../types';
 
-const METODOS = ['TRANSFERENCIA', 'EFECTIVO', 'TARJETA', 'CHEQUE'];
+const METODOS = ['TRANSFERENCIA', 'EFECTIVO', 'TARJETA', 'DOMICILIACION'];
 
 interface Contrato {
   id: number;
@@ -70,30 +70,36 @@ export default function ContratosPage() {
 
   const handleSave = async () => {
     if (!form.clienteId) { showToast('Selecciona un cliente', 'err'); return; }
-    if (!form.nombre) { showToast('Introduce un nombre', 'err'); return; }
+    if (!form.nombre?.trim()) { showToast('Introduce un nombre', 'err'); return; }
     if (!form.importe || form.importe <= 0) { showToast('El importe debe ser mayor que 0', 'err'); return; }
+    if (form.iva == null || form.iva < 0) { showToast('IVA inválido', 'err'); return; }
     if (!form.diaGeneracion || form.diaGeneracion < 1 || form.diaGeneracion > 28) {
       showToast('El día de generación debe estar entre 1 y 28', 'err'); return;
     }
     setSaving(true);
     try {
+      const payload = { ...form, nombre: form.nombre.trim() };
       if (editing) {
-        await updateContrato(editing, form);
+        await updateContrato(editing, payload);
         showToast('Contrato actualizado');
       } else {
-        await createContrato(form);
+        await createContrato(payload);
         showToast('Contrato creado');
       }
       setModal(false);
       await load();
-    } catch { showToast('Error al guardar', 'err'); }
+    } catch (err: any) {
+      showToast(err?.response?.data?.error || 'Error al guardar', 'err');
+    }
     finally { setSaving(false); }
   };
 
   const handleDelete = async (id: number) => {
     if (!confirm('¿Eliminar este contrato recurrente?')) return;
     try { await deleteContrato(id); showToast('Contrato eliminado'); await load(); }
-    catch { showToast('Error al eliminar', 'err'); }
+    catch (err: any) {
+      showToast(err?.response?.data?.error || 'Error al eliminar', 'err');
+    }
   };
 
   const handleGenerar = async (id: number, nombre: string) => {

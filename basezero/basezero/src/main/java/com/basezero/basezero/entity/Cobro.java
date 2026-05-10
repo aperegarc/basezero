@@ -2,8 +2,7 @@ package com.basezero.basezero.entity;
 
 import com.basezero.basezero.enums.MetodoPago;
 import jakarta.persistence.*;
-import lombok.*;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.Builder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -35,11 +34,9 @@ public class Cobro {
     @JoinColumn(name = "usuario_id")
     private Usuario usuario;
 
-    @Autowired
     public Cobro() {
     }
 
-    @Autowired
     public Cobro(Long id, BigDecimal cantidad, LocalDate fecha, MetodoPago metodoPago, Venta venta, Usuario usuario) {
         this.id = id;
         this.cantidad = cantidad;

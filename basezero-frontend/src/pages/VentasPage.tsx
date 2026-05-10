@@ -7,7 +7,7 @@ import { useEmpresaStore } from '../store/empresaStore';
 type Tab = 'FACTURA' | 'PRESUPUESTO' | 'ALBARAN';
 
 const ESTADOS = ['PENDIENTE', 'COBRADO', 'ANULADA'];
-const METODOS = ['TRANSFERENCIA', 'EFECTIVO', 'TARJETA', 'CHEQUE', 'DOMICILIACION'];
+const METODOS = ['TRANSFERENCIA', 'EFECTIVO', 'TARJETA', 'DOMICILIACION'];
 
 const BADGE: Record<string, { bg: string; color: string }> = {
   COBRADO:    { bg: '#D1FAE5', color: '#065F46' },
@@ -234,21 +234,33 @@ export default function VentasPage() {
 
   const handleSave = async () => {
     if (!form.clienteId) { showToast('Selecciona un cliente', 'err'); return; }
-    if (!form.codigo) { showToast('Introduce un código / número', 'err'); return; }
+    if (!form.codigo.trim()) { showToast('Introduce un código / número', 'err'); return; }
+    if (!form.fecha) { showToast('Introduce la fecha', 'err'); return; }
+    if (!form.lineas.length) { showToast('Añade al menos una línea', 'err'); return; }
+    for (let i = 0; i < form.lineas.length; i++) {
+      const l = form.lineas[i];
+      if (!l.nombre?.trim()) { showToast(`Línea ${i + 1}: falta la descripción`, 'err'); return; }
+      if (!l.unidades || l.unidades <= 0) { showToast(`Línea ${i + 1}: unidades > 0`, 'err'); return; }
+      if (l.precio == null || l.precio < 0) { showToast(`Línea ${i + 1}: precio inválido`, 'err'); return; }
+    }
     setSaving(true);
     try {
-      await createVenta({ ...form, total: totalForm });
+      await createVenta({ ...form, codigo: form.codigo.trim(), total: totalForm });
       showToast(`${TAB_LABELS[form.tipo].slice(0, -1)} creada`);
       setModal(false);
       load();
-    } catch { showToast('Error al guardar', 'err'); }
+    } catch (err: any) {
+      showToast(err?.response?.data?.error || 'Error al guardar', 'err');
+    }
     finally { setSaving(false); }
   };
 
   const handleDelete = async (id: number) => {
     if (!confirm('¿Eliminar este documento?')) return;
     try { await deleteVenta(id); showToast('Eliminado'); load(); }
-    catch { showToast('Error al eliminar', 'err'); }
+    catch (err: any) {
+      showToast(err?.response?.data?.error || 'Error al eliminar', 'err');
+    }
   };
 
   const handlePDF = (v: Venta) => {

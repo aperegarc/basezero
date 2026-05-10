@@ -1,7 +1,9 @@
 package com.basezero.basezero.controller;
 
+import com.basezero.basezero.dto.common.BulkResultDTO;
 import com.basezero.basezero.dto.turno.*;
 import com.basezero.basezero.service.TurnoService;
+import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -39,12 +41,30 @@ public class TurnoController {
     }
 
     @PostMapping
-    public ResponseEntity<TurnoResponseDTO> create(@RequestBody TurnoRequestDTO dto) {
+    public ResponseEntity<TurnoResponseDTO> create(@Valid @RequestBody TurnoRequestDTO dto) {
         return ResponseEntity.ok(turnoService.create(dto));
     }
 
+    @PostMapping("/bulk")
+    public ResponseEntity<BulkResultDTO<TurnoResponseDTO>> createBulk(
+            @Valid @RequestBody TurnoBulkRequestDTO request) {
+        return ResponseEntity.ok(turnoService.createBulk(request));
+    }
+
+    @PostMapping("/plantilla")
+    public ResponseEntity<BulkResultDTO<TurnoResponseDTO>> aplicarPlantilla(
+            @Valid @RequestBody TurnoPlantillaDTO request) {
+        return ResponseEntity.ok(turnoService.aplicarPlantilla(request));
+    }
+
+    @PostMapping("/copiar-semana")
+    public ResponseEntity<BulkResultDTO<TurnoResponseDTO>> copiarSemana(
+            @Valid @RequestBody TurnoCopiarSemanaDTO request) {
+        return ResponseEntity.ok(turnoService.copiarSemana(request));
+    }
+
     @PutMapping("/{id}")
-    public ResponseEntity<TurnoResponseDTO> update(@PathVariable Long id, @RequestBody TurnoRequestDTO dto) {
+    public ResponseEntity<TurnoResponseDTO> update(@PathVariable Long id, @Valid @RequestBody TurnoRequestDTO dto) {
         return ResponseEntity.ok(turnoService.update(id, dto));
     }
 

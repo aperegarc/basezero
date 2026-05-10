@@ -1,5 +1,6 @@
 package com.basezero.basezero.controller;
 
+import com.basezero.basezero.dto.common.BulkResultDTO;
 import com.basezero.basezero.dto.tarea.*;
 import com.basezero.basezero.service.TareaService;
 import jakarta.validation.Valid;
@@ -53,6 +54,18 @@ public class TareaController {
     @PostMapping
     public ResponseEntity<TareaResponseDTO> create(@Valid @RequestBody TareaRequestDTO dto) {
         return ResponseEntity.ok(tareaService.create(dto));
+    }
+
+    @PostMapping("/bulk")
+    public ResponseEntity<BulkResultDTO<TareaResponseDTO>> createBulk(
+            @Valid @RequestBody TareaBulkRequestDTO request) {
+        return ResponseEntity.ok(tareaService.createBulk(request));
+    }
+
+    @PostMapping("/programar")
+    public ResponseEntity<BulkResultDTO<TareaResponseDTO>> programar(
+            @Valid @RequestBody TareaProgramacionDTO request) {
+        return ResponseEntity.ok(tareaService.programar(request));
     }
 
     @PostMapping("/{id}/video")

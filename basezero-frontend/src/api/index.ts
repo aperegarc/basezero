@@ -136,6 +136,10 @@ export const getTareas = () => api.get('/tareas');
 export const getTareasByEmpleado = (id: number) => api.get(`/tareas/empleado/${id}`);
 export const getTareasPendientesRevision = () => api.get('/tareas/revision');
 export const createTarea = (data: any) => api.post('/tareas', data);
+export const createTareasBulk = (data: TareaBulkRequest) =>
+  api.post<BulkResult<any>>('/tareas/bulk', data);
+export const programarTareas = (data: TareaProgramacionRequest) =>
+  api.post<BulkResult<any>>('/tareas/programar', data);
 export const revisarTarea = (id: number, aprobada: boolean, comentario?: string) =>
   api.put(`/tareas/${id}/revisar?aprobada=${aprobada}${comentario ? `&comentario=${encodeURIComponent(comentario)}` : ''}`);
 export const deleteTarea = (id: number) => api.delete(`/tareas/${id}`);
@@ -145,7 +149,72 @@ export const updateTarea = (id: number, data: any) => api.put(`/tareas/${id}`, d
 export const getTurnos = () => api.get('/turnos');
 export const getTurnosByEmpleado = (id: number) => api.get(`/turnos/empleado/${id}`);
 export const createTurno = (data: any) => api.post('/turnos', data);
+export const createTurnosBulk = (data: TurnoBulkRequest) =>
+  api.post<BulkResult<any>>('/turnos/bulk', data);
+export const aplicarPlantillaTurnos = (data: TurnoPlantillaRequest) =>
+  api.post<BulkResult<any>>('/turnos/plantilla', data);
+export const copiarSemanaTurnos = (data: TurnoCopiarSemanaRequest) =>
+  api.post<BulkResult<any>>('/turnos/copiar-semana', data);
 export const updateTurno = (id: number, data: any) => api.put(`/turnos/${id}`, data);
 export const deleteTurno = (id: number) => api.delete(`/turnos/${id}`);
+
+// ---------- Tipos para operaciones masivas ----------
+export type DiaSemana =
+  | 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY';
+
+export interface BulkResult<T> {
+  creados: T[];
+  errores: { indice: number; identificador?: string; mensaje: string }[];
+  totalCreados: number;
+  totalFallidos: number;
+  totalOmitidos: number;
+}
+
+export interface TareaBulkRequest {
+  evitarDuplicados?: boolean;
+  continuarSiHayErrores?: boolean;
+  tareas: { empleadoId: number; clienteId: number; zona: string; fecha: string; notas?: string }[];
+}
+
+export interface TareaProgramacionRequest {
+  empleadoIds: number[];
+  clienteId: number;
+  zona: string;
+  fechaInicio: string;
+  fechaFin: string;
+  diasSemana?: DiaSemana[];
+  notas?: string;
+  evitarDuplicados?: boolean;
+}
+
+export interface TurnoBulkRequest {
+  evitarDuplicados?: boolean;
+  continuarSiHayErrores?: boolean;
+  turnos: { empleadoId: number; fecha: string; horaEntrada: string; horaSalida: string; notas?: string }[];
+}
+
+export interface HorarioDia {
+  diaSemana: DiaSemana;
+  horaEntrada: string;
+  horaSalida: string;
+}
+
+export interface TurnoPlantillaRequest {
+  empleadoIds: number[];
+  fechaInicio: string;
+  fechaFin: string;
+  horarios: HorarioDia[];
+  notas?: string;
+  evitarDuplicados?: boolean;
+  sobrescribir?: boolean;
+}
+
+export interface TurnoCopiarSemanaRequest {
+  empleadoIds: number[];
+  semanaOrigen: string;
+  semanaDestino: string;
+  repetirSemanas?: number;
+  evitarDuplicados?: boolean;
+}
 
 export default api;

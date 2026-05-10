@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import api, { getTareas, getTareasByEmpleado, createTarea, deleteTarea, revisarTarea, getEmpleados, getClientes, updateTarea } from '../api';
+import api, { getTareas, getTareasByEmpleado, createTarea, deleteTarea, revisarTarea, getEmpleados, getClientes, updateTarea, programarTareas } from '../api';
+import type { DiaSemana } from '../api';
 import { useAuthStore } from '../store/authStore';
 
 interface Tarea {
@@ -27,12 +28,35 @@ const estadoBadge = (estado: string) => ({
 
 const EMPTY = { empleadoId: 0, clienteId: 0, zona: '', fecha: new Date().toISOString().slice(0, 10), notas: '' };
 
+const DIAS_SEMANA: { key: DiaSemana; label: string; corto: string }[] = [
+  { key: 'MONDAY',    label: 'Lunes',     corto: 'L' },
+  { key: 'TUESDAY',   label: 'Martes',    corto: 'M' },
+  { key: 'WEDNESDAY', label: 'Miércoles', corto: 'X' },
+  { key: 'THURSDAY',  label: 'Jueves',    corto: 'J' },
+  { key: 'FRIDAY',    label: 'Viernes',   corto: 'V' },
+  { key: 'SATURDAY',  label: 'Sábado',    corto: 'S' },
+  { key: 'SUNDAY',    label: 'Domingo',   corto: 'D' },
+];
+
+const PROG_EMPTY = {
+  empleadoIds: [] as number[],
+  clienteId: 0,
+  zona: '',
+  fechaInicio: new Date().toISOString().slice(0, 10),
+  fechaFin: new Date(Date.now() + 6 * 86400000).toISOString().slice(0, 10),
+  diasSemana: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'] as DiaSemana[],
+  notas: '',
+  evitarDuplicados: true,
+};
+
 export default function TareasPage() {
   const [tareas, setTareas] = useState<Tarea[]>([]);
   const [empleados, setEmpleados] = useState<any[]>([]);
   const [clientes, setClientes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
+  const [progModal, setProgModal] = useState(false);
+  const [progForm, setProgForm] = useState(PROG_EMPTY);
   const [detalleModal, setDetalleModal] = useState<Tarea | null>(null);
   const [form, setForm] = useState<any>(EMPTY);
   const [saving, setSaving] = useState(false);
@@ -80,6 +104,59 @@ export default function TareasPage() {
     catch { showToast('Error al crear la tarea', 'err'); }
     finally { setSaving(false); }
   };
+
+  const handleProgramar = async () => {
+    if (progForm.empleadoIds.length === 0) { showToast('Selecciona al menos un empleado', 'err'); return; }
+    if (!progForm.clienteId) { showToast('Selecciona un cliente', 'err'); return; }
+    if (!progForm.zona.trim()) { showToast('Indica la zona o servicio', 'err'); return; }
+    if (progForm.diasSemana.length === 0) { showToast('Selecciona al menos un día de la semana', 'err'); return; }
+    if (new Date(progForm.fechaFin) < new Date(progForm.fechaInicio)) { showToast('La fecha fin no puede ser anterior a la inicio', 'err'); return; }
+    setSaving(true);
+    try {
+      const res = await programarTareas(progForm);
+      const { totalCreados, totalOmitidos, totalFallidos } = res.data;
+      const partes = [`${totalCreados} creadas`];
+      if (totalOmitidos) partes.push(`${totalOmitidos} omitidas (duplicadas)`);
+      if (totalFallidos) partes.push(`${totalFallidos} con error`);
+      showToast(partes.join(' · '), totalFallidos ? 'err' : 'ok');
+      setProgModal(false);
+      await load();
+    } catch { showToast('Error al programar las tareas', 'err'); }
+    finally { setSaving(false); }
+  };
+
+  const toggleEmpleadoProg = (id: number) => {
+    setProgForm(p => ({
+      ...p,
+      empleadoIds: p.empleadoIds.includes(id)
+        ? p.empleadoIds.filter(e => e !== id)
+        : [...p.empleadoIds, id]
+    }));
+  };
+
+  const toggleDiaProg = (dia: DiaSemana) => {
+    setProgForm(p => ({
+      ...p,
+      diasSemana: p.diasSemana.includes(dia)
+        ? p.diasSemana.filter(d => d !== dia)
+        : [...p.diasSemana, dia]
+    }));
+  };
+
+  const presetDias = (dias: DiaSemana[]) => setProgForm(p => ({ ...p, diasSemana: dias }));
+
+  const totalTareasProg = (() => {
+    if (!progForm.fechaInicio || !progForm.fechaFin || progForm.empleadoIds.length === 0 || progForm.diasSemana.length === 0) return 0;
+    const inicio = new Date(progForm.fechaInicio + 'T00:00:00');
+    const fin = new Date(progForm.fechaFin + 'T00:00:00');
+    if (fin < inicio) return 0;
+    const diasMap: Record<number, DiaSemana> = { 0: 'SUNDAY', 1: 'MONDAY', 2: 'TUESDAY', 3: 'WEDNESDAY', 4: 'THURSDAY', 5: 'FRIDAY', 6: 'SATURDAY' };
+    let dias = 0;
+    for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) {
+      if (progForm.diasSemana.includes(diasMap[d.getDay()])) dias++;
+    }
+    return dias * progForm.empleadoIds.length;
+  })();
 
   const handleRevisar = async (id: number, aprobada: boolean) => {
     try {
@@ -175,9 +252,14 @@ export default function TareasPage() {
             <option value="RECHAZADA">Rechazada</option>
           </select>
           {user?.rol !== 'EMPLEADO' && (
-            <button onClick={() => { setForm({ ...EMPTY, empleadoId: empleados[0]?.id || 0, clienteId: clientes[0]?.id || 0 }); setModal(true); }} style={{ padding: '.48rem .95rem', borderRadius: 7, border: 'none', background: '#00B4D8', cursor: 'pointer', fontSize: '.73rem', fontWeight: 700, color: '#0D1B2A' }}>
-              ＋ Asignar tarea
-            </button>
+            <>
+              <button onClick={() => { setProgForm({ ...PROG_EMPTY, clienteId: clientes[0]?.id || 0 }); setProgModal(true); }} style={{ padding: '.48rem .95rem', borderRadius: 7, border: '1px solid #00B4D8', background: '#fff', cursor: 'pointer', fontSize: '.73rem', fontWeight: 700, color: '#0090B0' }}>
+                📅 Programación
+              </button>
+              <button onClick={() => { setForm({ ...EMPTY, empleadoId: empleados[0]?.id || 0, clienteId: clientes[0]?.id || 0 }); setModal(true); }} style={{ padding: '.48rem .95rem', borderRadius: 7, border: 'none', background: '#00B4D8', cursor: 'pointer', fontSize: '.73rem', fontWeight: 700, color: '#0D1B2A' }}>
+                ＋ Asignar tarea
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -281,6 +363,107 @@ export default function TareasPage() {
               <button onClick={() => setModal(false)} style={{ padding: '.48rem .95rem', borderRadius: 7, border: '1px solid #E2E8F0', background: '#F8FAFC', cursor: 'pointer', fontSize: '.73rem', fontWeight: 700, color: '#2D3748' }}>Cancelar</button>
               <button onClick={handleSave} disabled={saving} style={{ padding: '.48rem .95rem', borderRadius: 7, border: 'none', background: '#00B4D8', cursor: saving ? 'not-allowed' : 'pointer', fontSize: '.73rem', fontWeight: 700, color: '#0D1B2A', opacity: saving ? .7 : 1 }}>
                 {saving ? 'Guardando...' : 'Asignar tarea'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal programación masiva */}
+      {progModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <span style={{ fontWeight: 800, fontSize: '.85rem', color: '#1A202C' }}>Programación masiva de tareas</span>
+                <div style={{ fontSize: '.65rem', color: '#718096', marginTop: '.2rem' }}>Asigna la misma tarea a varios empleados en un rango de fechas</div>
+              </div>
+              <button onClick={() => setProgModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: '#718096' }}>✕</button>
+            </div>
+            <div style={{ padding: '1.5rem', display: 'grid', gap: '1rem' }}>
+
+              {/* Empleados */}
+              <div>
+                <label style={labelStyle}>Empleados * <span style={{ color: '#A0AEC0', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>({progForm.empleadoIds.length} seleccionados)</span></label>
+                <div style={{ border: '1px solid #E2E8F0', borderRadius: 8, padding: '.5rem', maxHeight: 140, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '.3rem' }}>
+                  {empleados.filter(e => e.activo).length === 0 && (
+                    <div style={{ padding: '.5rem', fontSize: '.7rem', color: '#A0AEC0' }}>No hay empleados activos</div>
+                  )}
+                  {empleados.filter(e => e.activo).map(e => (
+                    <label key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '.4rem', padding: '.3rem .5rem', borderRadius: 6, background: progForm.empleadoIds.includes(e.id) ? 'rgba(0,180,216,.08)' : 'transparent', cursor: 'pointer', fontSize: '.72rem', color: '#2D3748' }}>
+                      <input type="checkbox" checked={progForm.empleadoIds.includes(e.id)} onChange={() => toggleEmpleadoProg(e.id)} style={{ accentColor: '#00B4D8' }} />
+                      {e.nombre}
+                    </label>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '.4rem', marginTop: '.4rem' }}>
+                  <button onClick={() => setProgForm(p => ({ ...p, empleadoIds: empleados.filter(e => e.activo).map(e => e.id) }))} style={{ padding: '.25rem .55rem', fontSize: '.62rem', fontWeight: 700, color: '#0090B0', background: 'rgba(0,180,216,.08)', border: 'none', borderRadius: 5, cursor: 'pointer' }}>Todos</button>
+                  <button onClick={() => setProgForm(p => ({ ...p, empleadoIds: [] }))} style={{ padding: '.25rem .55rem', fontSize: '.62rem', fontWeight: 700, color: '#718096', background: '#F1F5F9', border: 'none', borderRadius: 5, cursor: 'pointer' }}>Ninguno</button>
+                </div>
+              </div>
+
+              {/* Cliente y zona */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.8rem' }}>
+                <div>
+                  <label style={labelStyle}>Cliente *</label>
+                  <select value={progForm.clienteId} onChange={e => setProgForm({ ...progForm, clienteId: +e.target.value })} style={inputStyle}>
+                    <option value={0}>— Seleccionar —</option>
+                    {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Zona / Servicio *</label>
+                  <input value={progForm.zona} onChange={e => setProgForm({ ...progForm, zona: e.target.value })} placeholder="Ej: Limpieza zonas comunes" style={inputStyle} />
+                </div>
+              </div>
+
+              {/* Rango fechas */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.8rem' }}>
+                <div>
+                  <label style={labelStyle}>Fecha inicio *</label>
+                  <input type="date" value={progForm.fechaInicio} onChange={e => setProgForm({ ...progForm, fechaInicio: e.target.value })} style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Fecha fin *</label>
+                  <input type="date" value={progForm.fechaFin} onChange={e => setProgForm({ ...progForm, fechaFin: e.target.value })} style={inputStyle} />
+                </div>
+              </div>
+
+              {/* Días semana */}
+              <div>
+                <label style={labelStyle}>Días de la semana *</label>
+                <div style={{ display: 'flex', gap: '.3rem', flexWrap: 'wrap' }}>
+                  {DIAS_SEMANA.map(d => (
+                    <button key={d.key} onClick={() => toggleDiaProg(d.key)} title={d.label} style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid', borderColor: progForm.diasSemana.includes(d.key) ? '#00B4D8' : '#E2E8F0', background: progForm.diasSemana.includes(d.key) ? '#00B4D8' : '#fff', color: progForm.diasSemana.includes(d.key) ? '#0D1B2A' : '#718096', fontWeight: 800, fontSize: '.78rem', cursor: 'pointer' }}>{d.corto}</button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '.4rem', marginTop: '.5rem', flexWrap: 'wrap' }}>
+                  <button onClick={() => presetDias(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'])} style={{ padding: '.25rem .55rem', fontSize: '.62rem', fontWeight: 700, color: '#0090B0', background: 'rgba(0,180,216,.08)', border: 'none', borderRadius: 5, cursor: 'pointer' }}>L-V</button>
+                  <button onClick={() => presetDias(['SATURDAY', 'SUNDAY'])} style={{ padding: '.25rem .55rem', fontSize: '.62rem', fontWeight: 700, color: '#0090B0', background: 'rgba(0,180,216,.08)', border: 'none', borderRadius: 5, cursor: 'pointer' }}>Fin de semana</button>
+                  <button onClick={() => presetDias(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'])} style={{ padding: '.25rem .55rem', fontSize: '.62rem', fontWeight: 700, color: '#0090B0', background: 'rgba(0,180,216,.08)', border: 'none', borderRadius: 5, cursor: 'pointer' }}>Todos</button>
+                </div>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Notas internas</label>
+                <input value={progForm.notas} onChange={e => setProgForm({ ...progForm, notas: e.target.value })} style={inputStyle} />
+              </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.72rem', color: '#2D3748', cursor: 'pointer' }}>
+                <input type="checkbox" checked={progForm.evitarDuplicados} onChange={e => setProgForm({ ...progForm, evitarDuplicados: e.target.checked })} style={{ accentColor: '#00B4D8' }} />
+                Omitir duplicados (mismo empleado, cliente, zona y fecha)
+              </label>
+
+              {/* Resumen */}
+              <div style={{ background: 'rgba(0,180,216,.06)', border: '1px solid rgba(0,180,216,.2)', borderRadius: 8, padding: '.7rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '.72rem', color: '#0090B0', fontWeight: 600 }}>Tareas que se generarán</span>
+                <span style={{ fontSize: '1rem', fontWeight: 900, color: '#0D1B2A' }}>{totalTareasProg}</span>
+              </div>
+            </div>
+            <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '.6rem' }}>
+              <button onClick={() => setProgModal(false)} style={{ padding: '.48rem .95rem', borderRadius: 7, border: '1px solid #E2E8F0', background: '#F8FAFC', cursor: 'pointer', fontSize: '.73rem', fontWeight: 700, color: '#2D3748' }}>Cancelar</button>
+              <button onClick={handleProgramar} disabled={saving || totalTareasProg === 0} style={{ padding: '.48rem .95rem', borderRadius: 7, border: 'none', background: '#00B4D8', cursor: (saving || totalTareasProg === 0) ? 'not-allowed' : 'pointer', fontSize: '.73rem', fontWeight: 700, color: '#0D1B2A', opacity: (saving || totalTareasProg === 0) ? .5 : 1 }}>
+                {saving ? 'Generando...' : `Generar ${totalTareasProg} tareas`}
               </button>
             </div>
           </div>
