@@ -1,6 +1,7 @@
 package com.basezero.basezero.dto.tarea;
 
 import com.basezero.basezero.enums.EstadoTarea;
+import com.basezero.basezero.enums.TipoAdjuntoTarea;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 
@@ -15,6 +16,8 @@ public class TareaRequestDTO {
     @NotNull
     private LocalDate fecha;
     private EstadoTarea estado;
+    /** Si es null, se usa VIDEO (comportamiento anterior). */
+    private TipoAdjuntoTarea tipoAdjunto;
     private String notas;
     private String comentarioGestor;
 
@@ -28,6 +31,8 @@ public class TareaRequestDTO {
     public void setFecha(LocalDate fecha) { this.fecha = fecha; }
     public EstadoTarea getEstado() { return estado; }
     public void setEstado(EstadoTarea estado) { this.estado = estado; }
+    public TipoAdjuntoTarea getTipoAdjunto() { return tipoAdjunto; }
+    public void setTipoAdjunto(TipoAdjuntoTarea tipoAdjunto) { this.tipoAdjunto = tipoAdjunto; }
     public String getNotas() { return notas; }
     public void setNotas(String notas) { this.notas = notas; }
     public String getComentarioGestor() { return comentarioGestor; }

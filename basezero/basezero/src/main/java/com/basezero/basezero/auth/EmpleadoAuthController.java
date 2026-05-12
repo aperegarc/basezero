@@ -29,7 +29,7 @@ public class EmpleadoAuthController {
         String dni = body.get("dni").toUpperCase();
         String password = body.get("password");
 
-        Empleado empleado = empleadoRepository.findByDni(dni)
+        Empleado empleado = empleadoRepository.findByDniWithEmpresa(dni)
                 .orElseThrow(() -> new RuntimeException("DNI o contraseña incorrectos"));
 
         if (!empleado.getActivo())
@@ -46,7 +46,10 @@ public class EmpleadoAuthController {
                         java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_EMPLEADO"))
                 );
 
-        String token = jwtService.generateToken(userDetails, Map.of("rol", "EMPLEADO", "empleadoId", empleado.getId()));
+        String token = jwtService.generateToken(userDetails, Map.of(
+                "rol", "EMPLEADO",
+                "empleadoId", empleado.getId(),
+                "empresaId", empleado.getEmpresa().getId()));
 
         return ResponseEntity.ok(Map.of(
                 "token", token,

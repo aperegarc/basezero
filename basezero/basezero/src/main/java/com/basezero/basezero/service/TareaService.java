@@ -4,6 +4,7 @@ import com.basezero.basezero.dto.common.BulkResultDTO;
 import com.basezero.basezero.dto.tarea.*;
 import com.basezero.basezero.entity.*;
 import com.basezero.basezero.enums.EstadoTarea;
+import com.basezero.basezero.enums.TipoAdjuntoTarea;
 import com.basezero.basezero.repository.*;
 import com.basezero.basezero.security.EmpresaContext;
 import org.springframework.stereotype.Service;
@@ -23,7 +24,8 @@ public class TareaService {
     private final EmpleadoRepository empleadoRepository;
     private final ClienteRepository clienteRepository;
 
-    private static final String UPLOAD_DIR = "uploads/videos/";
+    private static final String UPLOAD_DIR_VIDEO = "uploads/videos/";
+    private static final String UPLOAD_DIR_FOTO = "uploads/fotos/";
 
     public TareaService(TareaRepository tareaRepository,
                         EmpleadoRepository empleadoRepository,
@@ -67,7 +69,8 @@ public class TareaService {
         Cliente cliente = clienteRepository.findById(dto.getClienteId())
                 .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
         validarPertenenciaEmpresa(empleado, cliente);
-        Tarea tarea = construirTarea(empleado, cliente, dto.getZona(), dto.getFecha(), dto.getNotas());
+        Tarea tarea = construirTarea(empleado, cliente, dto.getZona(), dto.getFecha(), dto.getNotas(),
+                resolverTipoAdjunto(dto.getTipoAdjunto()));
         return toDTO(tareaRepository.save(tarea));
     }
 
@@ -111,7 +114,8 @@ public class TareaService {
                     continue;
                 }
 
-                aGuardar.add(construirTarea(empleado, cliente, dto.getZona(), dto.getFecha(), dto.getNotas()));
+                aGuardar.add(construirTarea(empleado, cliente, dto.getZona(), dto.getFecha(), dto.getNotas(),
+                        resolverTipoAdjunto(dto.getTipoAdjunto())));
             } catch (RuntimeException ex) {
                 if (!request.isContinuarSiHayErrores()) throw ex;
                 resultado.addError(i, ex.getMessage());
@@ -159,6 +163,7 @@ public class TareaService {
                 ? cargarClavesDuplicadosTareaPorRango(empleadosCache.keySet(), dto.getFechaInicio(), dto.getFechaFin())
                 : Collections.emptySet();
 
+        TipoAdjuntoTarea tipoAdj = resolverTipoAdjunto(dto.getTipoAdjunto());
         List<Tarea> aGuardar = new ArrayList<>();
 
         for (Empleado empleado : empleadosCache.values()) {
@@ -169,7 +174,7 @@ public class TareaService {
                             && existentes.contains(claveDuplicado(empleado.getId(), cliente.getId(), dto.getZona(), fecha))) {
                         resultado.incrementarOmitidos();
                     } else {
-                        aGuardar.add(construirTarea(empleado, cliente, dto.getZona(), fecha, dto.getNotas()));
+                        aGuardar.add(construirTarea(empleado, cliente, dto.getZona(), fecha, dto.getNotas(), tipoAdj));
                     }
                 }
                 fecha = fecha.plusDays(1);
@@ -186,24 +191,75 @@ public class TareaService {
     public TareaResponseDTO subirVideo(Long tareaId, MultipartFile video, String comentario) throws IOException {
         Tarea tarea = tareaRepository.findById(tareaId)
                 .orElseThrow(() -> new RuntimeException("Tarea no encontrada"));
+        asegurarAccesoTarea(tarea);
+        if (tarea.getEstado() != EstadoTarea.PENDIENTE)
+            throw new RuntimeException("La tarea ya no está pendiente");
+        if (tarea.getTipoAdjunto() != TipoAdjuntoTarea.VIDEO)
+            throw new RuntimeException("Esta tarea no requiere vídeo");
 
-        Path uploadPath = Paths.get(UPLOAD_DIR);
+        Path uploadPath = Paths.get(UPLOAD_DIR_VIDEO);
         if (!Files.exists(uploadPath)) Files.createDirectories(uploadPath);
 
-        String filename = UUID.randomUUID() + "_" + video.getOriginalFilename();
+        String filename = UUID.randomUUID() + "_" + (video.getOriginalFilename() != null ? video.getOriginalFilename() : "video.bin");
         Path filePath = uploadPath.resolve(filename);
 
-        if (tarea.getVideoUrl() != null) {
-            try { Files.deleteIfExists(Paths.get(tarea.getVideoUrl())); } catch (Exception ignored) {}
-        }
+        borrarArchivoSiExiste(tarea.getVideoUrl());
 
         Files.copy(video.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
-        tarea.setVideoUrl(filePath.toString());
+        tarea.setVideoUrl(filePath.toString().replace('\\', '/'));
         tarea.setComentarioEmpleado(comentario);
         tarea.setEstado(EstadoTarea.COMPLETADA);
         tarea.setFechaCompletada(LocalDateTime.now());
 
+        return toDTO(tareaRepository.save(tarea));
+    }
+
+    @Transactional
+    public TareaResponseDTO subirFoto(Long tareaId, MultipartFile foto, String comentario) throws IOException {
+        Tarea tarea = tareaRepository.findById(tareaId)
+                .orElseThrow(() -> new RuntimeException("Tarea no encontrada"));
+        asegurarAccesoTarea(tarea);
+        if (tarea.getEstado() != EstadoTarea.PENDIENTE)
+            throw new RuntimeException("La tarea ya no está pendiente");
+        if (tarea.getTipoAdjunto() != TipoAdjuntoTarea.FOTO)
+            throw new RuntimeException("Esta tarea no requiere foto");
+        if (foto.isEmpty())
+            throw new RuntimeException("Selecciona un archivo de imagen");
+        if (!esImagen(foto))
+            throw new RuntimeException("El archivo debe ser una imagen (jpg, png, webp, gif)");
+
+        Path uploadPath = Paths.get(UPLOAD_DIR_FOTO);
+        if (!Files.exists(uploadPath)) Files.createDirectories(uploadPath);
+
+        String filename = UUID.randomUUID() + "_" + (foto.getOriginalFilename() != null ? foto.getOriginalFilename() : "foto.jpg");
+        Path filePath = uploadPath.resolve(filename);
+
+        borrarArchivoSiExiste(tarea.getVideoUrl());
+
+        Files.copy(foto.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+        tarea.setVideoUrl(filePath.toString().replace('\\', '/'));
+        tarea.setComentarioEmpleado(comentario);
+        tarea.setEstado(EstadoTarea.COMPLETADA);
+        tarea.setFechaCompletada(LocalDateTime.now());
+
+        return toDTO(tareaRepository.save(tarea));
+    }
+
+    @Transactional
+    public TareaResponseDTO completarSinAdjunto(Long tareaId, String comentario) {
+        Tarea tarea = tareaRepository.findById(tareaId)
+                .orElseThrow(() -> new RuntimeException("Tarea no encontrada"));
+        asegurarAccesoTarea(tarea);
+        if (tarea.getEstado() != EstadoTarea.PENDIENTE)
+            throw new RuntimeException("La tarea ya no está pendiente");
+        if (tarea.getTipoAdjunto() != TipoAdjuntoTarea.NINGUNO)
+            throw new RuntimeException("Esta tarea requiere subir foto o vídeo");
+
+        tarea.setComentarioEmpleado(comentario);
+        tarea.setEstado(EstadoTarea.COMPLETADA);
+        tarea.setFechaCompletada(LocalDateTime.now());
         return toDTO(tareaRepository.save(tarea));
     }
 
@@ -222,15 +278,51 @@ public class TareaService {
 
     // ------------------- helpers -------------------
 
-    private Tarea construirTarea(Empleado empleado, Cliente cliente, String zona, LocalDate fecha, String notas) {
+    private Tarea construirTarea(Empleado empleado, Cliente cliente, String zona, LocalDate fecha, String notas,
+                                 TipoAdjuntoTarea tipoAdjunto) {
         Tarea tarea = new Tarea();
         tarea.setEmpleado(empleado);
         tarea.setCliente(cliente);
         tarea.setZona(zona);
         tarea.setFecha(fecha);
         tarea.setEstado(EstadoTarea.PENDIENTE);
+        tarea.setTipoAdjunto(tipoAdjunto);
         tarea.setNotas(notas);
         return tarea;
+    }
+
+    private static TipoAdjuntoTarea resolverTipoAdjunto(TipoAdjuntoTarea t) {
+        return t != null ? t : TipoAdjuntoTarea.VIDEO;
+    }
+
+    private void asegurarAccesoTarea(Tarea tarea) {
+        Long empresaId = EmpresaContext.getEmpresaId();
+        if (tarea.getEmpleado().getEmpresa() == null
+                || !empresaId.equals(tarea.getEmpleado().getEmpresa().getId())) {
+            throw new RuntimeException("Tarea no encontrada");
+        }
+        EmpresaContext.getEmpleadoIdSiSesionEmpleado().ifPresent(empId -> {
+            if (!tarea.getEmpleado().getId().equals(empId))
+                throw new RuntimeException("No puedes modificar esta tarea");
+        });
+    }
+
+    private static void borrarArchivoSiExiste(String ruta) {
+        if (ruta == null || ruta.isBlank()) return;
+        try {
+            Files.deleteIfExists(Paths.get(ruta));
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static boolean esImagen(MultipartFile f) {
+        String ct = f.getContentType();
+        if (ct != null && ct.startsWith("image/")) return true;
+        String name = f.getOriginalFilename();
+        if (name == null) return false;
+        String lower = name.toLowerCase();
+        return lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png")
+                || lower.endsWith(".webp") || lower.endsWith(".gif");
     }
 
     private Map<Long, Empleado> cargarEmpleadosDeEmpresa(Set<Long> ids, Long empresaId) {
@@ -289,6 +381,7 @@ public class TareaService {
         dto.setZona(t.getZona());
         dto.setFecha(t.getFecha());
         dto.setEstado(t.getEstado());
+        dto.setTipoAdjunto(t.getTipoAdjunto());
         dto.setVideoUrl(t.getVideoUrl());
         dto.setComentarioEmpleado(t.getComentarioEmpleado());
         dto.setComentarioGestor(t.getComentarioGestor());

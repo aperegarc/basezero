@@ -76,6 +76,21 @@ public class TareaController {
         return ResponseEntity.ok(tareaService.subirVideo(id, video, comentario));
     }
 
+    @PostMapping("/{id}/foto")
+    public ResponseEntity<TareaResponseDTO> subirFoto(
+            @PathVariable Long id,
+            @RequestParam("foto") MultipartFile foto,
+            @RequestParam(value = "comentario", required = false) String comentario) throws IOException {
+        return ResponseEntity.ok(tareaService.subirFoto(id, foto, comentario));
+    }
+
+    @PostMapping("/{id}/completar")
+    public ResponseEntity<TareaResponseDTO> completarSinAdjunto(
+            @PathVariable Long id,
+            @RequestParam(value = "comentario", required = false) String comentario) {
+        return ResponseEntity.ok(tareaService.completarSinAdjunto(id, comentario));
+    }
+
     @PutMapping("/{id}/revisar")
     public ResponseEntity<TareaResponseDTO> revisar(
             @PathVariable Long id,

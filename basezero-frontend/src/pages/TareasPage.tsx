@@ -1,6 +1,18 @@
 import { useEffect, useState } from 'react';
-import api, { getTareas, getTareasByEmpleado, createTarea, deleteTarea, revisarTarea, getEmpleados, getClientes, updateTarea, programarTareas } from '../api';
-import type { DiaSemana } from '../api';
+import {
+  getTareas,
+  getTareasByEmpleado,
+  createTarea,
+  deleteTarea,
+  revisarTarea,
+  getEmpleados,
+  getClientes,
+  programarTareas,
+  completarTareaSinAdjunto,
+  subirVideoTarea,
+  subirFotoTarea,
+} from '../api';
+import type { DiaSemana, TipoAdjuntoTarea } from '../api';
 import { useAuthStore } from '../store/authStore';
 
 interface Tarea {
@@ -12,6 +24,7 @@ interface Tarea {
   zona: string;
   fecha: string;
   estado: 'PENDIENTE' | 'COMPLETADA' | 'APROBADA' | 'RECHAZADA';
+  tipoAdjunto?: TipoAdjuntoTarea;
   videoUrl?: string;
   comentarioEmpleado?: string;
   comentarioGestor?: string;
@@ -26,7 +39,14 @@ const estadoBadge = (estado: string) => ({
   RECHAZADA: { bg: '#FEE2E2', color: '#991B1B', label: 'Rechazada' },
 }[estado] || { bg: '#F1F5F9', color: '#475569', label: estado });
 
-const EMPTY = { empleadoId: 0, clienteId: 0, zona: '', fecha: new Date().toISOString().slice(0, 10), notas: '' };
+const EMPTY = {
+  empleadoId: 0,
+  clienteId: 0,
+  zona: '',
+  fecha: new Date().toISOString().slice(0, 10),
+  notas: '',
+  tipoAdjunto: 'VIDEO' as TipoAdjuntoTarea,
+};
 
 const DIAS_SEMANA: { key: DiaSemana; label: string; corto: string }[] = [
   { key: 'MONDAY',    label: 'Lunes',     corto: 'L' },
@@ -47,6 +67,24 @@ const PROG_EMPTY = {
   diasSemana: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'] as DiaSemana[],
   notas: '',
   evitarDuplicados: true,
+  tipoAdjunto: 'VIDEO' as TipoAdjuntoTarea,
+};
+
+const ADJUNTO_LABEL: Record<TipoAdjuntoTarea, string> = {
+  NINGUNO: 'Sin archivo',
+  FOTO: 'Foto',
+  VIDEO: 'Vídeo',
+};
+
+const mediaSrc = (path: string) => {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  const viteApi = import.meta.env.VITE_API_URL as string | undefined;
+  if (viteApi?.startsWith('http')) {
+    const origin = viteApi.replace(/\/api\/?$/, '');
+    return `${origin.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+  }
+  return `http://localhost:8080/${path.replace(/^\//, '')}`;
 };
 
 export default function TareasPage() {
@@ -64,7 +102,7 @@ export default function TareasPage() {
   const [filtroEstado, setFiltroEstado] = useState('TODOS');
   const [comentarioGestor, setComentarioGestor] = useState('');
   const [comentarioEmpleado, setComentarioEmpleado] = useState('');
-  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
 
   const { user } = useAuthStore();
@@ -172,28 +210,32 @@ export default function TareasPage() {
     catch { showToast('Error al eliminar', 'err'); }
   };
 
-  const handleUpdateEmpleado = async () => {
+  const handleCompletarEmpleado = async () => {
     if (!detalleModal) return;
+    const tipo: TipoAdjuntoTarea = detalleModal.tipoAdjunto ?? 'VIDEO';
+    if (tipo === 'FOTO' || tipo === 'VIDEO') {
+      if (!mediaFile) {
+        showToast(tipo === 'FOTO' ? 'Selecciona una foto' : 'Selecciona un vídeo', 'err');
+        return;
+      }
+    }
     setSaving(true);
     try {
-      const data: any = {};
-      if (comentarioEmpleado) data.comentarioEmpleado = comentarioEmpleado;
-      if (videoFile) {
-        const formData = new FormData();
-        formData.append('video', videoFile);
-        await api.post(`/tareas/${detalleModal.id}/upload-video`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-        data.videoUrl = `uploads/videos/${videoFile.name}`;
+      const com = comentarioEmpleado.trim() || undefined;
+      if (tipo === 'NINGUNO') {
+        await completarTareaSinAdjunto(detalleModal.id, com);
+      } else if (tipo === 'FOTO') {
+        await subirFotoTarea(detalleModal.id, mediaFile!, com);
+      } else {
+        await subirVideoTarea(detalleModal.id, mediaFile!, com);
       }
-      if (Object.keys(data).length > 0) {
-        await updateTarea(detalleModal.id, data);
-        showToast('Tarea actualizada');
-        setDetalleModal(null);
-        setComentarioEmpleado('');
-        setVideoFile(null);
-        await load();
-      }
-    } catch (err) {
-      showToast('Error al actualizar', 'err');
+      showToast('Tarea completada');
+      setDetalleModal(null);
+      setComentarioEmpleado('');
+      setMediaFile(null);
+      await load();
+    } catch {
+      showToast('Error al completar la tarea', 'err');
     } finally {
       setSaving(false);
     }
@@ -256,7 +298,7 @@ export default function TareasPage() {
               <button onClick={() => { setProgForm({ ...PROG_EMPTY, clienteId: clientes[0]?.id || 0 }); setProgModal(true); }} style={{ padding: '.48rem .95rem', borderRadius: 7, border: '1px solid #00B4D8', background: '#fff', cursor: 'pointer', fontSize: '.73rem', fontWeight: 700, color: '#0090B0' }}>
                 📅 Programación
               </button>
-              <button onClick={() => { setForm({ ...EMPTY, empleadoId: empleados[0]?.id || 0, clienteId: clientes[0]?.id || 0 }); setModal(true); }} style={{ padding: '.48rem .95rem', borderRadius: 7, border: 'none', background: '#00B4D8', cursor: 'pointer', fontSize: '.73rem', fontWeight: 700, color: '#0D1B2A' }}>
+              <button onClick={() => { setForm({ ...EMPTY, empleadoId: empleados[0]?.id || 0, clienteId: clientes[0]?.id || 0, tipoAdjunto: 'VIDEO' }); setModal(true); }} style={{ padding: '.48rem .95rem', borderRadius: 7, border: 'none', background: '#00B4D8', cursor: 'pointer', fontSize: '.73rem', fontWeight: 700, color: '#0D1B2A' }}>
                 ＋ Asignar tarea
               </button>
             </>
@@ -270,7 +312,7 @@ export default function TareasPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.75rem' }}>
             <thead>
               <tr style={{ background: '#0D1B2A' }}>
-                {['Empleado', 'Cliente', 'Zona / Servicio', 'Fecha', 'Estado', 'Vídeo', 'Acciones'].map(h => (
+                {['Empleado', 'Cliente', 'Zona / Servicio', 'Fecha', 'Estado', 'Evidencia', 'Acciones'].map(h => (
                   <th key={h} style={{ padding: '.6rem 1rem', textAlign: 'left', color: '#fff', fontWeight: 700, fontSize: '.62rem', letterSpacing: '.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
@@ -295,15 +337,16 @@ export default function TareasPage() {
                       <span style={{ padding: '.2rem .6rem', borderRadius: 20, fontSize: '.6rem', fontWeight: 700, background: badge.bg, color: badge.color }}>{badge.label}</span>
                     </td>
                     <td style={{ padding: '.65rem 1rem' }}>
-                      {t.videoUrl ? (
-                        <span style={{ padding: '.18rem .5rem', borderRadius: 20, fontSize: '.6rem', fontWeight: 700, background: '#D1FAE5', color: '#065F46' }}>🎥 Sí</span>
-                      ) : (
-                        <span style={{ padding: '.18rem .5rem', borderRadius: 20, fontSize: '.6rem', fontWeight: 700, background: '#F1F5F9', color: '#94A3B8' }}>Sin vídeo</span>
+                      <span style={{ padding: '.18rem .5rem', borderRadius: 20, fontSize: '.58rem', fontWeight: 700, background: '#E0F2FE', color: '#0369A1' }}>
+                        {ADJUNTO_LABEL[t.tipoAdjunto ?? 'VIDEO']}
+                      </span>
+                      {t.videoUrl && (
+                        <span style={{ marginLeft: '.35rem', padding: '.18rem .45rem', borderRadius: 20, fontSize: '.55rem', fontWeight: 700, background: '#D1FAE5', color: '#065F46' }}>✓</span>
                       )}
                     </td>
                     <td style={{ padding: '.65rem 1rem' }}>
                       <div style={{ display: 'flex', gap: '.3rem' }}>
-                        <button onClick={() => { setDetalleModal(t); setComentarioGestor(''); setComentarioEmpleado(''); setVideoFile(null); }}
+                        <button onClick={() => { setDetalleModal(t); setComentarioGestor(''); setComentarioEmpleado(''); setMediaFile(null); }}
                           style={{ padding: '.3rem .6rem', borderRadius: 6, border: '1px solid #E2E8F0', background: '#fff', cursor: 'pointer', fontSize: '.6rem', fontWeight: 700, color: '#2D3748' }}>
                           👁️ Ver
                         </button>
@@ -357,6 +400,18 @@ export default function TareasPage() {
               <div>
                 <label style={labelStyle}>Notas internas</label>
                 <input value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} style={inputStyle} onFocus={e => e.target.style.borderColor = '#00B4D8'} onBlur={e => e.target.style.borderColor = '#E2E8F0'} />
+              </div>
+              <div style={{ gridColumn: '1/-1' }}>
+                <label style={labelStyle}>Qué debe adjuntar el empleado</label>
+                <select
+                  value={form.tipoAdjunto}
+                  onChange={e => setForm({ ...form, tipoAdjunto: e.target.value as TipoAdjuntoTarea })}
+                  style={inputStyle}
+                >
+                  <option value="VIDEO">Vídeo</option>
+                  <option value="FOTO">Foto</option>
+                  <option value="NINGUNO">Ninguno (solo completar)</option>
+                </select>
               </div>
             </div>
             <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '.6rem' }}>
@@ -449,6 +504,19 @@ export default function TareasPage() {
                 <input value={progForm.notas} onChange={e => setProgForm({ ...progForm, notas: e.target.value })} style={inputStyle} />
               </div>
 
+              <div>
+                <label style={labelStyle}>Qué debe adjuntar el empleado</label>
+                <select
+                  value={progForm.tipoAdjunto}
+                  onChange={e => setProgForm({ ...progForm, tipoAdjunto: e.target.value as TipoAdjuntoTarea })}
+                  style={inputStyle}
+                >
+                  <option value="VIDEO">Vídeo</option>
+                  <option value="FOTO">Foto</option>
+                  <option value="NINGUNO">Ninguno (solo completar)</option>
+                </select>
+              </div>
+
               <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.72rem', color: '#2D3748', cursor: 'pointer' }}>
                 <input type="checkbox" checked={progForm.evitarDuplicados} onChange={e => setProgForm({ ...progForm, evitarDuplicados: e.target.checked })} style={{ accentColor: '#00B4D8' }} />
                 Omitir duplicados (mismo empleado, cliente, zona y fecha)
@@ -491,6 +559,7 @@ export default function TareasPage() {
                   { label: 'Cliente', value: detalleModal.clienteNombre },
                   { label: 'Zona / Servicio', value: detalleModal.zona },
                   { label: 'Fecha', value: detalleModal.fecha },
+                  { label: 'Adjunto requerido', value: ADJUNTO_LABEL[detalleModal.tipoAdjunto ?? 'VIDEO'] },
                 ].map(f => (
                   <div key={f.label} style={{ background: '#F8FAFC', borderRadius: 8, padding: '.6rem .8rem' }}>
                     <div style={{ fontSize: '.58rem', fontWeight: 700, color: '#718096', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.2rem' }}>{f.label}</div>
@@ -506,14 +575,20 @@ export default function TareasPage() {
                 </div>
               )}
 
-              {/* Vídeo */}
+              {/* Foto o vídeo subido */}
               {detalleModal.videoUrl ? (
                 <div style={{ marginBottom: '1.2rem' }}>
-                  <div style={{ fontSize: '.7rem', fontWeight: 700, color: '#1A202C', marginBottom: '.5rem' }}>🎥 Vídeo del empleado</div>
-                  <video controls style={{ width: '100%', borderRadius: 8, maxHeight: 280, background: '#000' }}>
-                    <source src={`http://localhost:8080/${detalleModal.videoUrl}`} />
-                    Tu navegador no soporta vídeo.
-                  </video>
+                  <div style={{ fontSize: '.7rem', fontWeight: 700, color: '#1A202C', marginBottom: '.5rem' }}>
+                    {(detalleModal.tipoAdjunto ?? 'VIDEO') === 'FOTO' ? '📷 Foto del empleado' : '🎥 Vídeo del empleado'}
+                  </div>
+                  {(detalleModal.tipoAdjunto ?? 'VIDEO') === 'FOTO' ? (
+                    <img src={mediaSrc(detalleModal.videoUrl)} alt="Evidencia" style={{ width: '100%', borderRadius: 8, maxHeight: 320, objectFit: 'contain', background: '#0f172a' }} />
+                  ) : (
+                    <video controls style={{ width: '100%', borderRadius: 8, maxHeight: 280, background: '#000' }}>
+                      <source src={mediaSrc(detalleModal.videoUrl)} />
+                      Tu navegador no soporta vídeo.
+                    </video>
+                  )}
                   {detalleModal.comentarioEmpleado && (
                     <div style={{ background: '#EDE9FE', borderRadius: 8, padding: '.6rem .8rem', marginTop: '.6rem' }}>
                       <div style={{ fontSize: '.62rem', fontWeight: 700, color: '#5B21B6', marginBottom: '.2rem' }}>COMENTARIO DEL EMPLEADO</div>
@@ -523,7 +598,9 @@ export default function TareasPage() {
                 </div>
               ) : (
                 <div style={{ background: '#F8FAFC', border: '1px dashed #E2E8F0', borderRadius: 8, padding: '1.2rem', textAlign: 'center', marginBottom: '1.2rem', color: '#A0AEC0', fontSize: '.73rem' }}>
-                  El empleado aún no ha subido el vídeo
+                  {(detalleModal.tipoAdjunto ?? 'VIDEO') === 'NINGUNO'
+                    ? (detalleModal.estado === 'PENDIENTE' ? 'Sin archivo requerido: el empleado solo marca completada.' : 'Sin archivo adjunto.')
+                    : 'El empleado aún no ha subido la evidencia'}
                 </div>
               )}
 
@@ -531,18 +608,33 @@ export default function TareasPage() {
               {user?.rol === 'EMPLEADO' && detalleModal.empleadoId === user.id && detalleModal.estado === 'PENDIENTE' && (
                 <div style={{ border: '1px solid #E2E8F0', borderRadius: 10, padding: '1rem' }}>
                   <div style={{ fontSize: '.72rem', fontWeight: 800, color: '#1A202C', marginBottom: '.7rem' }}>Completar tarea</div>
+                  <div style={{ fontSize: '.65rem', color: '#64748B', marginBottom: '.75rem' }}>
+                    {((detalleModal.tipoAdjunto ?? 'VIDEO') === 'NINGUNO') && 'No hace falta subir archivo. Puedes añadir un comentario opcional.'}
+                    {((detalleModal.tipoAdjunto ?? 'VIDEO') === 'FOTO') && 'Debes subir una foto como evidencia.'}
+                    {((detalleModal.tipoAdjunto ?? 'VIDEO') === 'VIDEO') && 'Debes subir un vídeo como evidencia.'}
+                  </div>
                   <div style={{ marginBottom: '.8rem' }}>
                     <label style={{ display: 'block', fontSize: '.62rem', fontWeight: 700, color: '#718096', marginBottom: '.3rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>Comentario (opcional)</label>
                     <textarea value={comentarioEmpleado} onChange={e => setComentarioEmpleado(e.target.value)} rows={2} placeholder="Escribe un comentario sobre la tarea..."
                       style={{ width: '100%', padding: '.55rem .8rem', border: '1px solid #E2E8F0', borderRadius: 7, fontSize: '.76rem', color: '#2D3748', fontFamily: "'Montserrat', sans-serif", outline: 'none', resize: 'vertical' }}
                       onFocus={e => e.target.style.borderColor = '#00B4D8'} onBlur={e => e.target.style.borderColor = '#E2E8F0'} />
                   </div>
-                  <div style={{ marginBottom: '.8rem' }}>
-                    <label style={{ display: 'block', fontSize: '.62rem', fontWeight: 700, color: '#718096', marginBottom: '.3rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>Subir vídeo (opcional)</label>
-                    <input type="file" accept="video/*" onChange={e => setVideoFile(e.target.files?.[0] || null)} style={{ width: '100%', padding: '.55rem .8rem', border: '1px solid #E2E8F0', borderRadius: 7, fontSize: '.76rem', color: '#2D3748', outline: 'none' }}
-                      onFocus={e => e.target.style.borderColor = '#00B4D8'} onBlur={e => e.target.style.borderColor = '#E2E8F0'} />
-                  </div>
-                  <button onClick={handleUpdateEmpleado} disabled={saving} style={{ width: '100%', padding: '.55rem', borderRadius: 8, border: 'none', background: '#00B4D8', cursor: saving ? 'not-allowed' : 'pointer', fontSize: '.75rem', fontWeight: 700, color: '#0D1B2A', opacity: saving ? .7 : 1 }}>
+                  {((detalleModal.tipoAdjunto ?? 'VIDEO') === 'FOTO' || (detalleModal.tipoAdjunto ?? 'VIDEO') === 'VIDEO') && (
+                    <div style={{ marginBottom: '.8rem' }}>
+                      <label style={{ display: 'block', fontSize: '.62rem', fontWeight: 700, color: '#718096', marginBottom: '.3rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                        {(detalleModal.tipoAdjunto ?? 'VIDEO') === 'FOTO' ? 'Subir foto' : 'Subir vídeo'}
+                      </label>
+                      <input
+                        type="file"
+                        accept={(detalleModal.tipoAdjunto ?? 'VIDEO') === 'FOTO' ? 'image/*' : 'video/*'}
+                        onChange={e => setMediaFile(e.target.files?.[0] || null)}
+                        style={{ width: '100%', padding: '.55rem .8rem', border: '1px solid #E2E8F0', borderRadius: 7, fontSize: '.76rem', color: '#2D3748', outline: 'none' }}
+                        onFocus={e => e.target.style.borderColor = '#00B4D8'}
+                        onBlur={e => e.target.style.borderColor = '#E2E8F0'}
+                      />
+                    </div>
+                  )}
+                  <button onClick={handleCompletarEmpleado} disabled={saving} style={{ width: '100%', padding: '.55rem', borderRadius: 8, border: 'none', background: '#00B4D8', cursor: saving ? 'not-allowed' : 'pointer', fontSize: '.75rem', fontWeight: 700, color: '#0D1B2A', opacity: saving ? .7 : 1 }}>
                     {saving ? 'Guardando...' : 'Completar tarea'}
                   </button>
                 </div>

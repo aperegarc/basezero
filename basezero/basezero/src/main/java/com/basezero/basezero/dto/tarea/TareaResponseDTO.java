@@ -1,6 +1,7 @@
 package com.basezero.basezero.dto.tarea;
 
 import com.basezero.basezero.enums.EstadoTarea;
+import com.basezero.basezero.enums.TipoAdjuntoTarea;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -14,6 +15,7 @@ public class TareaResponseDTO {
     private String zona;
     private LocalDate fecha;
     private EstadoTarea estado;
+    private TipoAdjuntoTarea tipoAdjunto;
     private String videoUrl;
     private String comentarioEmpleado;
     private String comentarioGestor;
@@ -36,6 +38,8 @@ public class TareaResponseDTO {
     public void setFecha(LocalDate fecha) { this.fecha = fecha; }
     public EstadoTarea getEstado() { return estado; }
     public void setEstado(EstadoTarea estado) { this.estado = estado; }
+    public TipoAdjuntoTarea getTipoAdjunto() { return tipoAdjunto; }
+    public void setTipoAdjunto(TipoAdjuntoTarea tipoAdjunto) { this.tipoAdjunto = tipoAdjunto; }
     public String getVideoUrl() { return videoUrl; }
     public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }
     public String getComentarioEmpleado() { return comentarioEmpleado; }

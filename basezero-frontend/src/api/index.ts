@@ -45,9 +45,8 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        // Pedir nuevo access token con la cookie HttpOnly
-        const res = await axios.post('/api/auth/refresh',
-          {}, { withCredentials: true });
+        const base = (api.defaults.baseURL || '/api').replace(/\/$/, '');
+        const res = await axios.post(`${base}/auth/refresh`, {}, { withCredentials: true });
 
         const newToken = res.data.token;
         localStorage.setItem('token', newToken);
@@ -145,6 +144,39 @@ export const revisarTarea = (id: number, aprobada: boolean, comentario?: string)
 export const deleteTarea = (id: number) => api.delete(`/tareas/${id}`);
 export const updateTarea = (id: number, data: any) => api.put(`/tareas/${id}`, data);
 
+export type TipoAdjuntoTarea = 'NINGUNO' | 'FOTO' | 'VIDEO';
+
+export const completarTareaSinAdjunto = (id: number, comentario?: string) =>
+  api.post<TareaResponse>(`/tareas/${id}/completar`, undefined, {
+    params: comentario ? { comentario } : {},
+  });
+
+export const subirVideoTarea = (id: number, file: File, comentario?: string) => {
+  const fd = new FormData();
+  fd.append('video', file);
+  return api.post<TareaResponse>(`/tareas/${id}/video`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    params: comentario ? { comentario } : {},
+  });
+};
+
+export const subirFotoTarea = (id: number, file: File, comentario?: string) => {
+  const fd = new FormData();
+  fd.append('foto', file);
+  return api.post<TareaResponse>(`/tareas/${id}/foto`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    params: comentario ? { comentario } : {},
+  });
+};
+
+/** Respuesta mínima de tarea (ampliar si hace falta) */
+export interface TareaResponse {
+  id: number;
+  tipoAdjunto?: TipoAdjuntoTarea;
+  videoUrl?: string;
+  estado?: string;
+}
+
 // Turnos
 export const getTurnos = () => api.get('/turnos');
 export const getTurnosByEmpleado = (id: number) => api.get(`/turnos/empleado/${id}`);
@@ -173,7 +205,7 @@ export interface BulkResult<T> {
 export interface TareaBulkRequest {
   evitarDuplicados?: boolean;
   continuarSiHayErrores?: boolean;
-  tareas: { empleadoId: number; clienteId: number; zona: string; fecha: string; notas?: string }[];
+  tareas: { empleadoId: number; clienteId: number; zona: string; fecha: string; notas?: string; tipoAdjunto?: TipoAdjuntoTarea }[];
 }
 
 export interface TareaProgramacionRequest {
@@ -185,6 +217,7 @@ export interface TareaProgramacionRequest {
   diasSemana?: DiaSemana[];
   notas?: string;
   evitarDuplicados?: boolean;
+  tipoAdjunto?: TipoAdjuntoTarea;
 }
 
 export interface TurnoBulkRequest {

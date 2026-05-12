@@ -1,6 +1,7 @@
 package com.basezero.basezero.entity;
 
 import com.basezero.basezero.enums.EstadoTarea;
+import com.basezero.basezero.enums.TipoAdjuntoTarea;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -31,6 +32,10 @@ public class Tarea {
     @Column(nullable = false)
     private EstadoTarea estado = EstadoTarea.PENDIENTE;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_adjunto", nullable = false, length = 16)
+    private TipoAdjuntoTarea tipoAdjunto = TipoAdjuntoTarea.VIDEO;
+
     private String videoUrl;
 
     @Column(columnDefinition = "TEXT")
@@ -55,6 +60,8 @@ public class Tarea {
     public void setFecha(LocalDate fecha) { this.fecha = fecha; }
     public EstadoTarea getEstado() { return estado; }
     public void setEstado(EstadoTarea estado) { this.estado = estado; }
+    public TipoAdjuntoTarea getTipoAdjunto() { return tipoAdjunto; }
+    public void setTipoAdjunto(TipoAdjuntoTarea tipoAdjunto) { this.tipoAdjunto = tipoAdjunto; }
     public String getVideoUrl() { return videoUrl; }
     public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }
     public String getComentarioEmpleado() { return comentarioEmpleado; }

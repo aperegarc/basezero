@@ -1,5 +1,6 @@
 package com.basezero.basezero.dto.tarea;
 
+import com.basezero.basezero.enums.TipoAdjuntoTarea;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.time.DayOfWeek;
@@ -39,6 +40,9 @@ public class TareaProgramacionDTO {
 
     private String notas;
 
+    /** Tipo de archivo que deberá adjuntar el empleado; por defecto VIDEO. */
+    private TipoAdjuntoTarea tipoAdjunto;
+
     /**
      * Si true (recomendado), no crea tareas duplicadas
      * (mismo empleado + cliente + zona + fecha).
@@ -59,6 +63,8 @@ public class TareaProgramacionDTO {
     public void setDiasSemana(List<DayOfWeek> diasSemana) { this.diasSemana = diasSemana; }
     public String getNotas() { return notas; }
     public void setNotas(String notas) { this.notas = notas; }
+    public TipoAdjuntoTarea getTipoAdjunto() { return tipoAdjunto; }
+    public void setTipoAdjunto(TipoAdjuntoTarea tipoAdjunto) { this.tipoAdjunto = tipoAdjunto; }
     public boolean isEvitarDuplicados() { return evitarDuplicados; }
     public void setEvitarDuplicados(boolean evitarDuplicados) { this.evitarDuplicados = evitarDuplicados; }
 }

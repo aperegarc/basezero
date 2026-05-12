@@ -56,15 +56,19 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 try {
                     userDetails = userDetailsService.loadUserByUsername(username);
                 } catch (org.springframework.security.core.userdetails.UsernameNotFoundException e) {
-                    // Si no encuentra el usuario (ej: empleado), crea un UserDetails genérico
-                    // basado en el JWT claims
+                    // Login por DNI (tabla empleados): el subject del JWT no es un email de usuarios.
                     Collection<org.springframework.security.core.GrantedAuthority> authorities = new ArrayList<>();
                     if (rol != null) {
                         authorities.add(new SimpleGrantedAuthority("ROLE_" + rol));
                     }
-                    userDetails = new org.springframework.security.core.userdetails.User(
-                            username, "", authorities
-                    );
+                    Long empresaId = claims.get("empresaId") instanceof Number n ? n.longValue() : null;
+                    Long empleadoId = claims.get("empleadoId") instanceof Number n ? n.longValue() : null;
+                    if ("EMPLEADO".equals(rol) && empresaId != null && empleadoId != null) {
+                        userDetails = new EmpleadoUserDetails(username, "", empresaId, empleadoId);
+                    } else {
+                        userDetails = new org.springframework.security.core.userdetails.User(
+                                username, "", authorities);
+                    }
                 }
 
                 if (jwtService.isTokenValid(jwt, userDetails)) {
