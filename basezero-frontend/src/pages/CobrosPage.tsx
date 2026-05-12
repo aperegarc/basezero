@@ -223,7 +223,7 @@ export default function CobrosPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.75rem', fontFamily: "'Montserrat', sans-serif" }}>
                 <thead>
                   <tr style={{ background: '#0D1B2A' }}>
-                    {['Nº Factura', 'Cliente', 'Total', 'Vencimiento', 'Cobrado', 'Pendiente', 'Acción'].map(h => (
+                    {['Nº Factura', 'Cliente', 'Estado', 'Total', 'Vencimiento', 'Cobrado', 'Pendiente', 'Acción'].map(h => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
@@ -238,6 +238,7 @@ export default function CobrosPage() {
                         onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}>
                         <td style={{ ...tdStyle, fontWeight: 700, color: '#1A202C', fontFamily: 'monospace' }}>{v.codigo}</td>
                         <td style={tdStyle}>{v.clienteNombre || '—'}</td>
+                        <td style={tdStyle}><BadgeEstado estado={v.estado} /></td>
                         <td style={{ ...tdStyle, fontWeight: 700 }}>{fmt(v.total || 0)} €</td>
                         <td style={{ ...tdStyle, color: '#718096' }}>{v.vencimiento || '—'}</td>
                         <td style={{ ...tdStyle, color: '#10B981', fontWeight: 700 }}>{fmt(cobrado)} €</td>
@@ -275,7 +276,7 @@ export default function CobrosPage() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.75rem', fontFamily: "'Montserrat', sans-serif" }}>
                   <thead>
                     <tr style={{ background: '#0D1B2A' }}>
-                      {['Nº Factura', 'Cliente', 'Total', 'Venció el', 'Días vencida', 'Pendiente', 'Acción'].map(h => (
+                      {['Nº Factura', 'Cliente', 'Estado', 'Total', 'Venció el', 'Días vencida', 'Pendiente', 'Acción'].map(h => (
                         <th key={h} style={thStyle}>{h}</th>
                       ))}
                     </tr>
@@ -293,6 +294,7 @@ export default function CobrosPage() {
                           onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = '#FFFBFB'}>
                           <td style={{ ...tdStyle, fontWeight: 700, color: '#1A202C', fontFamily: 'monospace' }}>{v.codigo}</td>
                           <td style={tdStyle}>{v.clienteNombre || '—'}</td>
+                          <td style={tdStyle}><BadgeEstado estado={v.estado} /></td>
                           <td style={{ ...tdStyle, fontWeight: 700 }}>{fmt(v.total || 0)} €</td>
                           <td style={{ ...tdStyle, color: '#EF4444', fontWeight: 700 }}>{v.vencimiento || '—'}</td>
                           <td style={tdStyle}>
@@ -338,7 +340,7 @@ export default function CobrosPage() {
                       onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#F8FAFC'}
                       onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ''}>
                       <td style={{ ...tdStyle, fontWeight: 700, color: '#1A202C', fontFamily: 'monospace' }}>
-                        {(c as any).ventaCodigo || `#${c.ventaId}`}
+                        {ventaLabel(c)}
                       </td>
                       <td style={tdStyle}>{(c as any).clienteNombre || '—'}</td>
                       <td style={{ ...tdStyle, fontWeight: 900, color: '#10B981', fontSize: '.82rem' }}>{fmt(Number(c.cantidad))} €</td>

@@ -1,16 +1,24 @@
 package com.basezero.basezero;
 
-import org.junit.jupiter.api.*;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.http.*;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ActiveProfiles("integrationtest")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class IntegrationTest {
 
@@ -88,8 +96,8 @@ public class IntegrationTest {
     void crear_usuario_gestor() {
         String body = """
                 {
-                    "username": "gestor_test",
-                    "password": "gestor123",
+                    "email": "gestor_test@basezero.test",
+                    "password": "Gestor123",
                     "nombre": "María",
                     "apellidos": "López García",
                     "iniciales": "ML",

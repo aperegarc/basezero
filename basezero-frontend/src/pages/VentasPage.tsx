@@ -263,32 +263,36 @@ export default function VentasPage() {
     }
   };
 
-  const handlePDF = (v: Venta) => {
-    const cliente = clientes.find(c => c.id === v.clienteId);
-    generarPDF(empresa, {
-      tipo: v.tipo as 'FACTURA' | 'PRESUPUESTO' | 'ALBARAN',
-      numero: v.codigo,
-      fecha: v.fecha,
-      vencimiento: v.vencimiento,
-      metodoPago: v.metodoPago,
-      cliente: {
-        nombre: cliente?.nombre || v.clienteNombre || '—',
-        cifNif: cliente?.cifNif || '',
-        direccion: cliente?.direccion || v.direccionFiscal || '',
-        email: cliente?.email || '',
-        telefono: cliente?.telefono || '',
-      },
-      lineas: (v.lineas || []).map(l => ({
-        producto: l.producto || '',
-        nombre: l.nombre || l.producto || '—',
-        descripcion: l.descripcion || '',
-        unidades: Number(l.unidades) || 1,
-        precio: Number(l.precio) || 0,
-        descuento: Number(l.descuento) || 0,
-        iva: Number(l.iva) || 21,
-        total: Number(l.total) || 0,
-      })),
-    });
+  const handlePDF = async (v: Venta) => {
+    try {
+      const cliente = clientes.find(c => c.id === v.clienteId);
+      await generarPDF(empresa, {
+        tipo: v.tipo as 'FACTURA' | 'PRESUPUESTO' | 'ALBARAN',
+        numero: v.codigo,
+        fecha: v.fecha,
+        vencimiento: v.vencimiento,
+        metodoPago: v.metodoPago,
+        cliente: {
+          nombre: cliente?.nombre || v.clienteNombre || '—',
+          cifNif: cliente?.cifNif || '',
+          direccion: cliente?.direccion || v.direccionFiscal || '',
+          email: cliente?.email || '',
+          telefono: cliente?.telefono || '',
+        },
+        lineas: (v.lineas || []).map(l => ({
+          producto: l.producto || '',
+          nombre: l.nombre || l.producto || '—',
+          descripcion: l.descripcion || '',
+          unidades: Number(l.unidades) || 1,
+          precio: Number(l.precio) || 0,
+          descuento: Number(l.descuento) || 0,
+          iva: Number(l.iva) || 21,
+          total: Number(l.total) || 0,
+        })),
+      });
+    } catch {
+      showToast('Error al generar el PDF', 'err');
+    }
   };
 
   const tabVentas = ventas.filter(v => (v.tipo || 'FACTURA') === tab);

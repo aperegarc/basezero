@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
+import { logoutSession } from '../../api';
 
 const NAV = [
   { section: 'PRINCIPAL' },
@@ -33,9 +34,15 @@ export default function Layout() {
     return true;
   });
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await logoutSession();
+    } catch {
+      /* red aunque falle el revoke */
+    } finally {
+      logout();
+      navigate('/login');
+    }
   };
 
   const pageTitles: Record<string, string> = {

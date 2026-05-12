@@ -13,7 +13,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/turnos")
-@PreAuthorize("hasAnyRole('EMPLEADO', 'ADMINISTRADOR')")
+@PreAuthorize("hasAnyRole('EMPLEADO', 'ADMINISTRADOR', 'GESTOR', 'OPERARIO')")
 public class TurnoController {
 
     private final TurnoService turnoService;

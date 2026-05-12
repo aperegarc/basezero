@@ -67,7 +67,16 @@ api.interceptors.response.use(
     }
 
     if (err.response?.status === 403) {
-      window.location.href = '/login';
+      const reqUrl = String(originalRequest?.url || '');
+      const isAuthLogin =
+          reqUrl.includes('/auth/login') ||
+          reqUrl.includes('/empleados/auth/login') ||
+          reqUrl.includes('/empresas/registro');
+      const onLoginPage = window.location.pathname.startsWith('/login');
+      const onRegistroPage = window.location.pathname.startsWith('/registro');
+      if (!isAuthLogin && !onLoginPage && !onRegistroPage) {
+        window.location.href = '/login';
+      }
     }
 
     return Promise.reject(err);
@@ -77,6 +86,9 @@ api.interceptors.response.use(
 // Auth
 export const login = (username: string, password: string) =>
   api.post('/auth/login', { username, password });
+
+/** Revoca refresh token en servidor y borra cookie HttpOnly (credentials). */
+export const logoutSession = () => api.post('/auth/logout');
 
 export const registroEmpresa = (data: {
   nombreEmpresa: string;
@@ -142,7 +154,6 @@ export const programarTareas = (data: TareaProgramacionRequest) =>
 export const revisarTarea = (id: number, aprobada: boolean, comentario?: string) =>
   api.put(`/tareas/${id}/revisar?aprobada=${aprobada}${comentario ? `&comentario=${encodeURIComponent(comentario)}` : ''}`);
 export const deleteTarea = (id: number) => api.delete(`/tareas/${id}`);
-export const updateTarea = (id: number, data: any) => api.put(`/tareas/${id}`, data);
 
 export type TipoAdjuntoTarea = 'NINGUNO' | 'FOTO' | 'VIDEO';
 

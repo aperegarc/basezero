@@ -1,4 +1,3 @@
-import jsPDF from 'jspdf';
 import type { EmpresaConfig } from '../store/empresaStore';
 
 const CYAN = '#00B4D8';
@@ -49,26 +48,42 @@ function hexToRgb(hex: string): [number, number, number] {
   return [parseInt(clean.slice(0,2),16), parseInt(clean.slice(2,4),16), parseInt(clean.slice(4,6),16)];
 }
 
-function setRgb(doc: jsPDF, hex: string) {
+/** Instancia jsPDF (carga dinámica del módulo en `generarPDF`). */
+type PdfDoc = {
+  setTextColor(r: number, g: number, b: number): void;
+  setFillColor(r: number, g: number, b: number): void;
+  setDrawColor(r: number, g: number, b: number): void;
+  setLineWidth(w: number): void;
+  line(x1: number, y1: number, x2: number, y2: number): void;
+  rect(x: number, y: number, w: number, h: number, style?: string): void;
+  setFont(f: string, style?: string): void;
+  setFontSize(s: number): void;
+  text(t: string, x: number, y: number): void;
+  getTextWidth(t: string): number;
+  save(filename?: string): void;
+};
+
+function setRgb(doc: PdfDoc, hex: string) {
   const [r,g,b] = hexToRgb(hex);
   doc.setTextColor(r,g,b);
 }
 
-function fillR(doc: jsPDF, x: number, y: number, w: number, h: number, hex: string) {
+function fillR(doc: PdfDoc, x: number, y: number, w: number, h: number, hex: string) {
   const [r,g,b] = hexToRgb(hex);
   doc.setFillColor(r,g,b);
   doc.rect(x,y,w,h,'F');
 }
 
-function drawL(doc: jsPDF, x1: number, y: number, x2: number, hex: string = BORDER) {
+function drawL(doc: PdfDoc, x1: number, y: number, x2: number, hex: string = BORDER) {
   const [r,g,b] = hexToRgb(hex);
   doc.setDrawColor(r,g,b);
   doc.setLineWidth(0.3);
   doc.line(x1,y,x2,y);
 }
 
-export function generarPDF(empresa: EmpresaConfig, data: DocumentoPDFData): void {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+export async function generarPDF(empresa: EmpresaConfig, data: DocumentoPDFData): Promise<void> {
+  const { default: JsPDF } = await import('jspdf');
+  const doc = new JsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' }) as unknown as PdfDoc;
   const W = 210, margin = 15, contentW = W - margin * 2;
   let y = margin;
 

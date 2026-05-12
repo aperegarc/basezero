@@ -5,7 +5,7 @@ import { useEmpresaStore } from '../store/empresaStore';
 
 export default function RegistroPage() {
   const navigate = useNavigate();
-  const { setConfig } = useEmpresaStore();
+  const { setConfig, config } = useEmpresaStore();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -51,8 +51,9 @@ export default function RegistroPage() {
         passwordAdmin: form.passwordAdmin,
       });
       
-      // Guardar datos de la empresa en el store
+      // Guardar datos de la empresa en el store (merge con configuración existente / valores por defecto)
       setConfig({
+        ...config,
         nombre: form.nombreEmpresa,
         email: form.emailEmpresa,
         cif: '',

@@ -15,7 +15,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/tareas")
-@PreAuthorize("hasAnyRole('EMPLEADO', 'ADMINISTRADOR')")
+@PreAuthorize("hasAnyRole('EMPLEADO', 'ADMINISTRADOR', 'GESTOR', 'OPERARIO')")
 public class TareaController {
 
     private final TareaService tareaService;
